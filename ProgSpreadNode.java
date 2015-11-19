@@ -18,7 +18,8 @@ public class ProgSpreadNode extends Program {
     
     public void main() {
         println("Initializing...");
-        receiveFromAll();
+        while(true)
+            receiveFromAll();
     }
     
     private void println(String str) {
@@ -26,15 +27,17 @@ public class ProgSpreadNode extends Program {
     }
     
     private void receiveFromAll() {
+        println("Waiting for message...");
         int index = in().select();
         Message msg = in(index).receive();
         
         if (msg instanceof SpreadMessage) {
             println("Received Spread Message");
             handleSpreadMessage((SpreadMessage)msg);
-        } else if (msg instanceof DonationMessage){
-            println("Received Donation Message");
-//            handleDonateMessage(msg);
+        } else if ((msg instanceof SlotsMessageSync) ||
+         (msg instanceof SlotsMessageRequest)
+                || (msg instanceof SlotsMessageDonate)){
+            handleSlotsMessage((SlotsMessage)msg);
         }
     }
     
@@ -44,22 +47,33 @@ public class ProgSpreadNode extends Program {
                 processJoin(msg.getNodeId());
                 break;
             case SpreadMessage.LEAVE_REQ:
-                println("Processing Spread LEAVE Message");
+                processLeave(msg.getNodeId());
                 break;
         }
+    }        
+    
+    private void handleSlotsMessage(SlotsMessage msg) {
+        println("This show handle a slot message!");
     }        
     
     private void processJoin(int sourceNode) {
         println("Processing Spread JOIN_REQ Message from Node " + sourceNode);
         registeredNodes[sourceNode] = 1;
-        sendToAll(new SpreadMessage(SpreadMessage.JOIN_OK, sourceNode));
+        sendToAll(new SpreadMessage(SpreadMessage.JOIN_OK, sourceNode, this.registeredNodes));
     }
+    
+    private void processLeave(int sourceNode) {
+        println("Processing Spread LEAVE_REQ Message from Node " + sourceNode);
+        registeredNodes[sourceNode] = 0;
+        sendToAll(new SpreadMessage(SpreadMessage.LEAVE_OK, sourceNode, this.registeredNodes));
+    }    
       
     
     private void sendToAll(Message msg) {
         /* send to  all, including requester */
-        for(int i=1; i<=SlotsDonation.NODES; i++){
-             out(i).send(msg);
+        for(int i=0; i<SlotsDonation.NODES; i++){
+            println("Sending message to " + i);
+            out(i).send(msg);
         } 
         broadcasted++;        
     }
@@ -70,9 +84,15 @@ public class ProgSpreadNode extends Program {
 
     }
     
-    @Override
     public String getText() {
-        return "Broadcasted " + broadcasted + " messages so far ";
+        int count = 0;
+        for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
+            if (registeredNodes[i] == 1) {
+                count ++;
+            }
+            
+        }
+        return "Nodes Joined: " + count+ ".Broadcasted " + broadcasted + " messages so far ";
     }
     
 }

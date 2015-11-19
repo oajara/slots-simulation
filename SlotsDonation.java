@@ -5,7 +5,7 @@ public class SlotsDonation extends Application {
     
     public static final int WINW = 800;
     public static final int WINH = 600;
-    public static final int NODES = 1;
+    public static final int NODES = 3;
     public static final int MAX_NODES = 4;
     public static final int SLOTS = 30;
 
