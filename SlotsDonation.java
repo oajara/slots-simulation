@@ -7,7 +7,7 @@ public class SlotsDonation extends Application {
     public static final int WINH = 600;
     public static final int NODES = 3;
     public static final int MAX_NODES = 4;
-    public static final int SLOTS = 30;
+    public static final int TOTAL_SLOTS = 30;
 
     public static void main(String[] args) {
         new SlotsDonation().run();
@@ -40,7 +40,7 @@ public class SlotsDonation extends Application {
         
         /* create normal nodes from index one */
         for(int i=1; i<=NODES; i++){
-             nodes[i] = node(new ProgNormalNode(i, SLOTS/NODES), String.valueOf(i),
+             nodes[i] = node(new ProgNormalNode(i, TOTAL_SLOTS/NODES), String.valueOf(i),
                      Math.abs(random.nextInt()) % WINW, Math.abs(random.nextInt()) % WINH);
         } 
         

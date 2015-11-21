@@ -5,26 +5,25 @@ import java.util.*;
 
 
 public class ProgNormalNode extends Program {
-    public static final int INACTIVE = 0;
-    public static final int ACTIVE = 1;
-    public static final int READY = 2;
+    public static final int STS_ACTIVE = 1;
+    public static final int STS_RUNNING = 2;
+    public static final int STS_WAIT_STATUS = 3;
+    public static final int STS_WAIT_INIT = 4;
         
     private Random random;
-    private int[] slotsTable = new int[SlotsDonation.SLOTS];
+    private Slot[] slotsTable = new Slot[SlotsDonation.SLOTS];
     private int[] registeredNodes = new int[SlotsDonation.MAX_NODES+1];
+    private boolean[] initializedNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private int nodeId;
-    private int status;
+    private int state;
+    private int activeNodes = 0;
+    private int primaryMember;
+    private int ownedSlots;
     
-    public ProgNormalNode(int id, int slots) { 
+    public ProgNormalNode(int id) { 
         this.random = new Random();
-        this.status = INACTIVE;
         this.nodeId = id;
-        
-        /* initialize slots table */
-        for (int i = 1; i < SlotsDonation.SLOTS; i++ ) {
-            slotsTable[i] = 0;
-        }        
-    }
+}
     
     private void println(String str) {
         System.out.println("Node[" + nodeId + "]: "+str);
@@ -33,47 +32,8 @@ public class ProgNormalNode extends Program {
     public void main()  {
         println("Initializing...");
         // Join Spread
-        out(0).send(new SpreadMessage(SpreadMessage.JOIN_REQ, nodeId));
-        Message msg;
-        while(status == INACTIVE) {
-            println("Waiting for join ok message...");
-            msg = in(0).receive();
-            if (msg instanceof SpreadMessage && ((SpreadMessage)msg).getNodeId() == nodeId) {
-                println("Joined!");
-                status = ACTIVE;
-                registeredNodes = ((SpreadMessage)msg).getData();
-            } else {
-                println("Received a message but not what I am waiting for. Ignore.");
-            }
-        }
-        
-        /* now I need a valid slots table */
-        if(iAmPrimary()) {
-            /* all slots are mine */
-            for(int i = 0; i<SlotsDonation.SLOTS; i++) {
-                slotsTable[i] = nodeId;
-                status = READY;
-            }
-        } else {
-            /* wait for sync info */
-            while(status == ACTIVE) {
-                println("Waiting for join ok message...");
-                msg = in(0).receive();
-                if (msg instanceof SpreadMessage && ((SpreadMessage)msg).getNodeId() == nodeId) {
-                    println("Ready!");
-                    status = READY;
-                    slotsTable = ((SlotsMessageSync)msg).getTable();
-                } else {
-                    println("Received a message but not what I am waiting for. Ignore.");
-                }
-            }            
-        }
-        
-        /* Now I am ready to go */
-        startDonatingAlgorithm();
-           
-        /* I am done. Leave */
-        out(0).send(new SpreadMessage(SpreadMessage.LEAVE_REQ, nodeId));
+        out(0).send(new SpreadMessageJoin(this.nodeId));
+ 
     }
     
     private boolean iAmPrimary() {
@@ -93,43 +53,160 @@ public class ProgNormalNode extends Program {
     private void startDonatingAlgorithm() {
         println("This should run the rest of the algorithm.");
         while(true)
-            receiveFromAll();        
+            slotsLoop();        
     }    
     
-    private void receiveFromAll() {
+    private void slotsLoop() {
         println("Waiting for message...");
         int index = in().select();
         Message msg = in(index).receive();
         
-        if (msg instanceof SpreadMessage) {
+        if (!(msg instanceof SpreadMessage)) {
+            println("Received Slots Message");
+            if(msg instanceof SlotsMessageRequest) {
+                handleSlotsRequest((SlotsMessageRequest)msg);
+            } else if (msg instanceof SlotsMessageDonate) {
+                handleSlotsDonation((SlotsMessageDonate)msg);
+            } else if (msg instanceof SlotsMessagePutStatus) {
+                handleSlotsPutStatus((SlotsMessagePutStatus)msg);
+            }  else if (msg instanceof SlotsMessageInitialized) {
+                handleSlotsInitialized((SlotsMessageInitialized)msg);
+            } else if (msg instanceof SlotsMessageNewStatus) {
+                handleSlotsNewStatus((SlotsMessageNewStatus)msg);
+            } else if (msg instanceof SlotsMessageMergeStatus) {
+                handleSlotsMergeStatus((SlotsMessageMergeStatus)msg);
+            }
+        } else {
             println("Received Spread Message");
-            handleSpreadMessage((SpreadMessage)msg);
-        } else if (msg instanceof SlotsMessageSync) {
-            handleSlotsMessageSync((SlotsMessageSync)msg);
-        } else if (msg instanceof SlotsMessageDonate) {
-            handleSlotsMessageDonate((SlotsMessageDonate)msg);
-        } else if (msg instanceof SlotsMessageRequest) {
-            handleSlotsMessageRequest((SlotsMessageRequest)msg);
+            if(msg instanceof SpreadMessageJoin) {
+                handleSpreadJoin((SpreadMessageJoin)msg);
+            } else if (msg instanceof SpreadMessageLeave) {
+                handleSpreadLeave((SpreadMessageLeave)msg);
+            }
         }
     }    
+    
+    private void handleSpreadJoin(SpreadMessageJoin msg) {
+        println("Handling Spread Join");
+        if( msg.getNewNode() == this.nodeId){ /* The own JOIN message	*/
+            if (activeNodes == 1) { 		/* It is a LONELY member*/
 
-    private void handleSlotsMessageRequest(SlotsMessageRequest msg) {
+                /* it is ready to start running */
+                this.state = STS_RUNNING;
+
+                /* it is the Primary Member 	*/
+                this.primaryMember = nodeId;
+
+                /* update registered nodes table */
+                this.registeredNodes = msg.getRegisteredNodes();
+                
+                /* allocate all slots to the member */
+                this.ownedSlots = SlotsDonation.TOTAL_SLOTS;		
+                for (int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
+                    slotsTable[i].setOwner(nodeId);
+                }   
+                
+            } else {
+                /* Waiting Global status info */
+                this.state = STS_WAIT_STATUS;	
+            }
+	} else { /* Other node JOINs the group	*/
+            println("Member "+nodeId+" state="+this.state);
+
+            /* I am not initialized yet */
+            if( (this.initializedNodes[nodeId]) && (this.state != STS_WAIT_INIT)) {
+                return;
+            }
+
+            /* if the new member was previously considered as a member of other    */
+            /* partition but really had crashed, allocate its slots to primary_mbr */
+            println("TODO: Is the new member previously considered as a member of other partition? new_mbr="+msg.getNewNode());
+//		for (i = vm_ptr->vm_nr_sysprocs; i < (vm_ptr->vm_nr_tasks + vm_ptr->vm_nr_procs); i++) {
+//                    if ( (slot[i].s_owner == new_mbr)
+//                        && 	(TEST_BIT(slot[i].s_flags, BIT_SLOT_PARTITION) )) {
+//                        if (primary_mbr == local_nodeid){
+//                            free_slots++;
+//                            owned_slots++;
+//                        }
+//                        total_slots++;
+//                        slot[i].s_owner = primary_mbr;
+//                        CLR_BIT(slot[i].s_flags, BIT_SLOT_PARTITION);
+//                        TASKDEBUG("Restoring slot %d from member %d considered alive in other partition\n",
+//                                i, new_mbr);
+//                    }
+//		}
+
+            if (primaryMember == nodeId && this.state == STS_RUNNING ) { 	
+                sendStatusInfo();
+            }
+	}
+    }
+    
+    private void sendStatusInfo() {
+        SlotsMessagePutStatus msg = new SlotsMessagePutStatus(
+                this.slotsTable, this.initializedNodes, this.nodeId);
+
+        /* Send the Global status info to new members */
+        println("Send Global status\n");
+        broadcast(msg);
+    }    
+    
+    private void handleSpreadLeave(SpreadMessageLeave msg) {
+        println("Handling Spread Leave");
+    }    
+
+    private void handleSlotsRequest(SlotsMessageRequest msg) {
         println("Handling Slots Request");
     }
     
-    private void handleSlotsMessageDonate(SlotsMessageDonate msg) {
+    private void handleSlotsDonation(SlotsMessageDonate msg) {
         println("Handling Slots Donate");
     }
     
-    private void handleSlotsMessageSync(SlotsMessageSync msg) {
-        println("Handling Slots Sync");
+    private void handleSlotsPutStatus(SlotsMessagePutStatus msg) {
+        println("Handling Slots Put Status");
+        int member =msg.getSenderId();
+        
+        //if( !(FSM_state & MASK_INITIALIZED)) {
+        if( !isInitialized(this.nodeId)) {
+            primaryMember = member;
+        } else {
+            if(primaryMember != member) {
+                println("SYS_PUT_STATUS: current primaryMember="+primaryMember+" differs from new primarymember="+member);
+            }
+            if(isInitialized(member)){
+                println("SYS_PUT_STATUS: primaryMember="+primaryMember+" is not in bm_init");
+            }
+        }
+        //println("SYS_PUT_STATUS: primarymember="+primaryMember+" table has %d slots");// ret/sizeof(slot_t));
+        this.slotsTable = msg.getSlotsTable();
+        this.initializedNodes = msg.getInitializedNodes();
+        this.state = STS_WAIT_INIT;
+        
+	/* Report to other nodes as INITILIZED */
+	println("Multicasting SYS_INITIALIZED");
+
+        SlotsMessageInitialized new_msg = new SlotsMessageInitialized(this.nodeId);
+	broadcast(new_msg);        
+    }
+    
+    private boolean isInitialized(int nodeId) {
+        return this.initializedNodes[nodeId];
+    }
+    
+    private void handleSlotsNewStatus(SlotsMessageNewStatus msg) {
+        println("Handling Slots New Status");
     }    
     
-    private void handleSpreadMessage(SpreadMessage msg) {
-        println("Handling Spread Message");
+    private void handleSlotsMergeStatus(SlotsMessageMergeStatus msg) {
+        println("Handling Slots Merge Status");
     }        
     
-    /**
+    private void handleSlotsInitialized(SlotsMessageInitialized msg) {
+        println("Handling Slots Initialize");
+    }    
+    
+   /**
      * Broadcasting a message is sending it to the spread node
      * @param msg 
      */
@@ -144,7 +221,7 @@ public class ProgNormalNode extends Program {
     public int getSlotsNumber() {
         int counter = 0;
         for(int i = 0; i<SlotsDonation.SLOTS; i++) {
-            if(slotsTable[i] == nodeId) {
+            if(slotsTable[i].getOwner() == nodeId) {
                 counter++;
             }
         }        
@@ -153,14 +230,15 @@ public class ProgNormalNode extends Program {
     
     private String getStatusAsString() {
         switch(this.status) {
-            case INACTIVE:
+            case STS_ACTIVE:
                 return "Inactive";       
-            case ACTIVE:
+            case STS_ACTIVE:
                 return "Active";                
-            case READY:
+            case STS_RUNNING:
                 return "Ready";       
             default:
                 return "Unknown";
         }
     }
+
 }

@@ -53,20 +53,30 @@ public class ProgSpreadNode extends Program {
     }        
     
     private void handleSlotsMessage(SlotsMessage msg) {
-        println("This show handle a slot message!");
+        if(isActive(msg.getSenderId())) {
+            sendToAll(msg);
+        } else {
+            println("Received a Slot message from a non-active node. Discard...");
+        }
     }        
     
-    private void processJoin(int sourceNode) {
-        println("Processing Spread JOIN_REQ Message from Node " + sourceNode);
-        registeredNodes[sourceNode] = 1;
-        sendToAll(new SpreadMessage(SpreadMessage.JOIN_OK, sourceNode, this.registeredNodes));
+    private boolean isActive(int nodeId) {
+        return registeredNodes[nodeId] == 1;
     }
     
-    private void processLeave(int sourceNode) {
-        println("Processing Spread LEAVE_REQ Message from Node " + sourceNode);
-        registeredNodes[sourceNode] = 0;
-        sendToAll(new SpreadMessage(SpreadMessage.LEAVE_OK, sourceNode, this.registeredNodes));
-    }    
+    private void processJoin(SpreadMessageJoin msg) { //TODO: receive same message and update with registered nodes table
+        println("Processing Spread JOIN Message from Node " + msg.getSenderId());
+        registeredNodes[msg.getSenderId()] = 1;
+        msg.setRegisteredNodes(registeredNodes);
+        sendToAll(msg);
+    }
+    
+    private void processLeave(SpreadMessageJLeave msg) { //TODO: receive same message and update with registered nodes table
+        println("Processing Spread LEAVE Message from Node " + msg.getSenderId());
+        registeredNodes[msg.getSenderId()] = 0;
+        msg.setRegisteredNodes(registeredNodes);
+        sendToAll(msg);
+    } 
       
     
     private void sendToAll(Message msg) {
@@ -78,12 +88,6 @@ public class ProgSpreadNode extends Program {
         broadcasted++;        
     }
     
-    public void broadCastMessage() {
-        int index = in().select();
-        Message msg = in(index).receive();
-
-    }
-    
     public String getText() {
         int count = 0;
         for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
@@ -92,7 +96,7 @@ public class ProgSpreadNode extends Program {
             }
             
         }
-        return "Nodes Joined: " + count+ ".Broadcasted " + broadcasted + " messages so far ";
+        return "Active Nodes: " + count+ ".Broadcasted " + broadcasted + " messages so far ";
     }
     
 }
