@@ -1,7 +1,7 @@
 import daj.Message;
 
 public abstract class SlotsMessage extends Message {
-    private int senderId;
+    protected int senderId;
     
     public SlotsMessage(int senderId) {
         this.senderId = senderId;

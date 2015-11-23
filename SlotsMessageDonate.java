@@ -1,24 +1,26 @@
-
+import java.util.Arrays;
 public class SlotsMessageDonate extends SlotsMessage {
-    int quantity;
-    int destination;
-    
-    public SlotsMessageDonate(int quantity, int destination_node) {
-        this.quantity = quantity;
-        this.destination = destination_node;
+    int requester;
+    int[] donatedIdList;
+
+    public SlotsMessageDonate(int requester, int[] donatedIdList, int senderId) {
+        super(senderId);
+        this.requester = requester;
+        this.donatedIdList = donatedIdList;
     }
-    
-    public int getQuantity() {
-        return this.quantity;
+
+    public int getRequester() {
+        return requester;
     }
+
     
-    public int getDestination() {
-        return this.destination;
+    public int[] getDonatedIdList() {
+        return donatedIdList;
     }    
     
     @Override
     public String getText() {
-        return "Donation Message of ["+this.quantity+"] slots to node ["+this.destination+"]";
+        return "Donation Message from Node#"+requester+" to Node#"+senderId+ "\nDonated Slots IDs: "+Arrays.toString(donatedIdList);
     }
 }
 

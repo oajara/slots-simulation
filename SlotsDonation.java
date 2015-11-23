@@ -5,7 +5,7 @@ public class SlotsDonation extends Application {
     
     public static final int WINW = 800;
     public static final int WINH = 600;
-    public static final int NODES = 3;
+    public static final int NODES = 2;
     public static final int MAX_NODES = 4;
     public static final int TOTAL_SLOTS = 30;
 
@@ -13,6 +13,7 @@ public class SlotsDonation extends Application {
         new SlotsDonation().run();
     }
 
+    @Override
     public void resetStatistics() {
     }
 
@@ -20,6 +21,7 @@ public class SlotsDonation extends Application {
         super("Slots Donation Algorithm", WINW, WINH);
     }
 
+    @Override
     public String getText() {
         return "Slots Donation Algorithm\n \n" +
           "TODO: complete this info";
@@ -28,6 +30,7 @@ public class SlotsDonation extends Application {
     /**
      * Create randomly distributed mesh of nodes.
      */
+    @Override
     public void construct() {
         Random random = new Random();
         Node[] nodes;
@@ -36,98 +39,22 @@ public class SlotsDonation extends Application {
         
         /* create spread node at index zero */
         nodes[0] = node(new ProgSpreadNode(), "Spread Node",
-                     Math.abs(random.nextInt()) % WINW, Math.abs(random.nextInt()) % WINH);
+                     //Math.abs(random.nextInt()) % WINW, Math.abs(random.nextInt()) % WINH);
+                     WINW / 2, (int) Math.round(WINH * 0.9));
         
         /* create normal nodes from index one */
+        int gap = (int) Math.round(WINW / (NODES+1));
         for(int i=1; i<=NODES; i++){
-             nodes[i] = node(new ProgNormalNode(i, TOTAL_SLOTS/NODES), String.valueOf(i),
-                     Math.abs(random.nextInt()) % WINW, Math.abs(random.nextInt()) % WINH);
+             nodes[i] = node(new ProgNormalNode(i), String.valueOf(i),
+//                     Math.abs(random.nextInt()) % WINW, Math.abs(random.nextInt()) % WINH);
+                       i * gap, (int) Math.round(WINH * 0.1));
         } 
         
-        /* build links creating a mesh */
-        for(int i=0; i<=NODES; i++){
-            for(int j=0; j<=NODES; j++){
-                if(i != j) {
-                    link(nodes[i], nodes[j]);
-                }
-            }
+        /* build links creating a star */
+        for(int i=1; i<=NODES; i++){
+            link(nodes[0], nodes[i]);
+            link(nodes[i], nodes[0]);
         }          
     }
     
 }
-//
-//class DonationMessage extends Message {
-//    public static final int DONATE = 1;
-//    public static final int REQUEST = 2;
-//    int type;
-//    
-//    public DonationMessage(int type) {
-//        this.type = type;
-//    }
-//    
-//    public String getText() {
-//        switch(this.type) {
-//            case DONATE:
-//                return "Donate";
-//            case REQUEST:
-//                return "Request";
-//            default:
-//                return "Unknown";
-//        }
-//    }
-//}
-
-/**
- * Message for Slot Donation
- */
-//class SlotDonateMsg extends Message {
-//    int donor;
-//    int quantity;
-//    
-//    
-//    public SlotDonateMsg(int donor, int quantity) {
-//        this.donor = donor;
-//        this.quantity = quantity;
-//    }
-//    
-//    public int getDonor() {
-//        return this.donor;
-//    }
-//    
-//    public int getQuantity() {
-//        return this.quantity;
-//    }
-//    
-//    public String getText() {
-//        return String.valueOf(this.donor) + " donates " +
-//                String.valueOf(this.quantity) + " slots ";
-//    }
-//}
-//
-///**
-// * Message for Slot Requests
-// */
-//class SlotRequestMsg extends Message {
-//    int request;
-//    int quantity;
-//    
-//    
-//    public SlotRequestMsg(int request, int quantity) {
-//        this.request = request;
-//        this.quantity = quantity;
-//    }
-//    
-//    public int getDonor() {
-//        return this.request;
-//    }
-//    
-//    public int getQuantity() {
-//        return this.quantity;
-//    }
-//    
-//    public String getText() {
-//        return String.valueOf(this.request) + " requests " +
-//                String.valueOf(this.quantity) + " slots ";
-//    }
-//}
-

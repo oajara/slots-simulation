@@ -34,21 +34,16 @@ public class ProgSpreadNode extends Program {
         if (msg instanceof SpreadMessage) {
             println("Received Spread Message");
             handleSpreadMessage((SpreadMessage)msg);
-        } else if ((msg instanceof SlotsMessageSync) ||
-         (msg instanceof SlotsMessageRequest)
-                || (msg instanceof SlotsMessageDonate)){
+        } else {
             handleSlotsMessage((SlotsMessage)msg);
         }
     }
     
     private void handleSpreadMessage(SpreadMessage msg) {
-        switch(msg.getType()) {
-            case SpreadMessage.JOIN_REQ:
-                processJoin(msg.getNodeId());
-                break;
-            case SpreadMessage.LEAVE_REQ:
-                processLeave(msg.getNodeId());
-                break;
+        if (msg instanceof SpreadMessageJoin) {
+            processJoin((SpreadMessageJoin)msg);
+        } else if (msg instanceof SpreadMessageLeave) {
+            processLeave((SpreadMessageLeave)msg);
         }
     }        
     
@@ -64,14 +59,14 @@ public class ProgSpreadNode extends Program {
         return registeredNodes[nodeId] == 1;
     }
     
-    private void processJoin(SpreadMessageJoin msg) { //TODO: receive same message and update with registered nodes table
+    private void processJoin(SpreadMessageJoin msg) { 
         println("Processing Spread JOIN Message from Node " + msg.getSenderId());
         registeredNodes[msg.getSenderId()] = 1;
         msg.setRegisteredNodes(registeredNodes);
         sendToAll(msg);
     }
     
-    private void processLeave(SpreadMessageJLeave msg) { //TODO: receive same message and update with registered nodes table
+    private void processLeave(SpreadMessageLeave msg) { 
         println("Processing Spread LEAVE Message from Node " + msg.getSenderId());
         registeredNodes[msg.getSenderId()] = 0;
         msg.setRegisteredNodes(registeredNodes);
@@ -81,8 +76,9 @@ public class ProgSpreadNode extends Program {
     
     private void sendToAll(Message msg) {
         /* send to  all, including requester */
+        println("Sending message to all nodes...");
         for(int i=0; i<SlotsDonation.NODES; i++){
-            println("Sending message to " + i);
+            
             out(i).send(msg);
         } 
         broadcasted++;        
