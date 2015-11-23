@@ -60,8 +60,8 @@ public class ProgNormalNode extends Program {
                     handleSlotsRequest((SlotsMessageRequest)msg);
                 } else if (msg instanceof SlotsMessageDonate) {
                     handleSlotsDonation((SlotsMessageDonate)msg);
-//                } else if (msg instanceof SlotsMessagePutStatus) {
-//                    handleSlotsPutStatus((SlotsMessagePutStatus)msg);
+                } else if (msg instanceof SlotsMessagePutStatus) {
+                    handleSlotsPutStatus((SlotsMessagePutStatus)msg);
                 }  else if (msg instanceof SlotsMessageInitialized) {
                     handleSlotsInitialized((SlotsMessageInitialized)msg);
                 } else if (msg instanceof SlotsMessageNewStatus) {
@@ -133,7 +133,7 @@ public class ProgNormalNode extends Program {
             println("Other member joines the group:"+nodeId+". My State="+this.getStateAsString());
 
             /* I am not initialized yet */
-            if( (!this.initializedNodes[nodeId]) && (this.state != STS_WAIT_INIT)) {
+            if( (!this.initializedNodes[this.nodeId]) && (this.state != STS_WAIT_INIT)) {
                 println("I'm not Inizialized nor waiting init. My State:" +this.getStateAsString());
                 return;
             }
@@ -146,7 +146,7 @@ public class ProgNormalNode extends Program {
     
     private void sendStatusInfo() {
         SlotsMessagePutStatus msg = new SlotsMessagePutStatus(
-                this.slotsTable, this.initializedNodes, this.nodeId);
+                this.slotsTable.clone(), this.initializedNodes.clone(), this.nodeId);
 
         /* Send the Global status info to new members */
         println("Send Global status");
@@ -235,7 +235,7 @@ public class ProgNormalNode extends Program {
         }
 
         SlotsMessageDonate donMsg = new SlotsMessageDonate(
-                msg.getSenderId(), donatedSlotsList, this.nodeId);        
+                msg.getSenderId(), donatedSlotsList.clone(), this.nodeId);        
         broadcast(donMsg);        
     }
     
@@ -293,9 +293,9 @@ public class ProgNormalNode extends Program {
         }
 
         //println("SYS_PUT_STATUS: primarymember="+primaryMember+" table has %d slots");// ret/sizeof(slot_t));
-        this.slotsTable = msg.getSlotsTable();
+        this.slotsTable = msg.getSlotsTable().clone();
         println("Updating Initialized nodes table...");
-        this.initializedNodes = msg.getInitializedNodes();
+        this.initializedNodes = msg.getInitializedNodes().clone();
         this.state = STS_WAIT_INIT;
         
 	/* Report to other nodes as INITILIZED */
@@ -404,7 +404,7 @@ public class ProgNormalNode extends Program {
         println("Sending slot request");	
 
         /* set donors*/
-        bm_donors = this.initializedNodes;
+        bm_donors = this.initializedNodes.clone();
         bm_donors[this.nodeId] = false;
 
         if(countActive(bm_donors) == 0) {
