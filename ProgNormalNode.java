@@ -1,8 +1,6 @@
 import daj.Message;
 import daj.Program;
-
 import java.util.*;
-
 
 public class ProgNormalNode extends Program {
     public static final int STS_ACTIVE = 1;
@@ -13,6 +11,7 @@ public class ProgNormalNode extends Program {
     public static final int STS_REQ_SLOTS = 5;
     
     public static final int MIN_OWNED_SLOTS = 5;
+    public static final int MAX_OWNED_SLOTS = 20;
     public static final int FREE_SLOTS_LOW = 2;
     public static final int SLOTS_BY_MSG = 5;
     
@@ -20,10 +19,12 @@ public class ProgNormalNode extends Program {
     private Slot[] slotsTable = new Slot[SlotsDonation.TOTAL_SLOTS];
     private int[] registeredNodes = new int[SlotsDonation.MAX_NODES+1];
     private boolean[] initializedNodes = new boolean[SlotsDonation.MAX_NODES+1];
+    private boolean[] donors = new boolean[SlotsDonation.MAX_NODES+1];
     private int nodeId;
     private int state = STS_JUST_BORN;
     private int activeNodes = 0;
     private int primaryMember;
+    ProcessManagement pm = new ProcessManagement(5, this);
     
     public ProgNormalNode(int id) { 
         this.random = new Random();
@@ -33,19 +34,91 @@ public class ProgNormalNode extends Program {
         }  
 }
     
-    private void println(String str) {
+    public void println(String str) {
         System.out.println("Node[" + nodeId + "]: "+str);
     }    
     
     @Override
     public void main()  {
+//        println("Initializing...");
+//        Message msg;
+//        if(this.nodeId == 1) {
+//            println("Waiting for node 2");
+//            int index = in().select();
+//            in(index).receive(2);
+//        } else {
+//            msg = new Message();
+//            out(1).send(msg);
+//        }
+//        
+//        while(true) {
+//            int sleeping = (this.random.nextInt(4)+1) * 1000;
+//            println("Sleeping "+sleeping+" seconds");
+//            
+//            try {
+//                Thread.sleep(sleeping);
+//                out(1).send(new Message());
+//            } catch(InterruptedException ex) {
+//                println("Wasssa");
+//            }
+//        }
+
         println("Initializing (sending JOIN message)");
-        
+
         // Join Spread
         out(0).send(new SpreadMessageJoin(this.nodeId));
         
         // Start with algorithm
         slotsLoop();
+    }
+    
+    private boolean doFork() {
+        int leftover;
+        
+	if( getFreeSlots() < FREE_SLOTS_LOW ) {
+            if( getOwnedSlots() < MAX_OWNED_SLOTS ) { /* do I achieve the maximum threshold  ? */
+                if(countActive(this.donors) == 0) { 	/*  if there pending donation requests? */
+                    if( getOwnedSlots() < (MAX_OWNED_SLOTS/getInitializedNodes()))
+                        leftover = (MAX_OWNED_SLOTS/getInitializedNodes()) - getOwnedSlots();
+                    else
+                        leftover = FREE_SLOTS_LOW - getFreeSlots();
+                    println("leftover="+leftover+" free_slots="+getFreeSlots()+" free_slots_low="+FREE_SLOTS_LOW+" bm_donors="+Arrays.toString(this.donors));
+                    println("owned_slots="+getOwnedSlots()+" max_owned_slots="+MAX_OWNED_SLOTS);
+                    mbrRqstSlots(leftover);
+                }
+            }
+        }
+	
+	if(getFreeSlots() == 0) {
+            return(false);
+	} else {
+            markSlotUsed();
+            return (true);
+        }        
+    }
+    
+    private void doExit() {
+        markSlotFree();
+    }
+    
+    /** find first owned busy slot and free it **/
+    private void markSlotFree() {
+        for(int i = 0; i<SlotsDonation.TOTAL_SLOTS; i++) {
+            if(slotsTable[i].isUsed() && slotsTable[i].getOwner() == this.nodeId) {
+                slotsTable[i].setStatus(Slot.STATUS_FREE);
+                return;
+            }
+        }           
+    }
+    
+    /** find first owned free slot and use it **/
+    private void markSlotUsed() {
+        for(int i = 0; i<SlotsDonation.TOTAL_SLOTS; i++) {
+            if(slotsTable[i].isFree() && slotsTable[i].getOwner() == this.nodeId) {
+                slotsTable[i].setStatus(Slot.STATUS_USED);
+                return;
+            }
+        }           
     }
     
     private void slotsLoop() {
@@ -279,9 +352,9 @@ public class ProgNormalNode extends Program {
             this.state = STS_RUNNING;
 	}	
 
-//	CLR_BIT(bm_donors, spin_ptr->m_source);
+        this.donors[msg.getSenderId()] = false;
 	println("free_slots="+getFreeSlots()+" free_slots_low="+FREE_SLOTS_LOW);
-	println("owned_slots="+getOwnedSlots()+" max_owned_slots=? bm_donors=?");        
+	println("owned_slots="+getOwnedSlots()+" max_owned_slots="+MAX_OWNED_SLOTS+" bm_donors="+ Arrays.toString(donors));        
     }
     
     private void handleSlotsPutStatus(SlotsMessagePutStatus msg) {
@@ -399,15 +472,13 @@ public class ProgNormalNode extends Program {
      * It builds and broadcasts a message requesting slots
      *===========================================================================*/
     private void mbrRqstSlots(int nr_slots) {
-        boolean[] bm_donors;
-        
         println("Sending slot request");	
 
         /* set donors*/
-        bm_donors = this.initializedNodes.clone();
-        bm_donors[this.nodeId] = false;
+        this.donors = this.initializedNodes.clone();
+        this.donors[this.nodeId] = false;
 
-        if(countActive(bm_donors) == 0) {
+        if(countActive(this.donors) == 0) {
             return;
         }
         

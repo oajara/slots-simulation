@@ -55,6 +55,9 @@ public class SlotsDonation extends Application {
             link(nodes[0], nodes[i]);
             link(nodes[i], nodes[0]);
         }          
+        
+//        link(nodes[1], nodes[2]);
+//        link(nodes[2], nodes[1]);
     }
     
 }
