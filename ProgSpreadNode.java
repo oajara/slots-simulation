@@ -7,12 +7,12 @@ import daj.Program;
 
 public class ProgSpreadNode extends Program {
     int broadcasted = 0;
-    private int[] registeredNodes = new int[SlotsDonation.MAX_NODES+1];
+    private boolean[] registeredNodes = new boolean[SlotsDonation.MAX_NODES+1];
     
     public ProgSpreadNode() {
         /* no nodes at the beggining */
         for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
-            registeredNodes[i] = 0;
+            registeredNodes[i] = false;
         }
     }   
     
@@ -56,19 +56,19 @@ public class ProgSpreadNode extends Program {
     }        
     
     private boolean isActive(int nodeId) {
-        return registeredNodes[nodeId] == 1;
+        return registeredNodes[nodeId] == true;
     }
     
     private void processJoin(SpreadMessageJoin msg) { 
         println("Processing Spread JOIN Message from Node " + msg.getSenderId());
-        registeredNodes[msg.getSenderId()] = 1;
+        registeredNodes[msg.getSenderId()] = true;
         msg.setRegisteredNodes(registeredNodes);
         sendToAll(msg);
     }
     
     private void processLeave(SpreadMessageLeave msg) { 
         println("Processing Spread LEAVE Message from Node " + msg.getSenderId());
-        registeredNodes[msg.getSenderId()] = 0;
+        registeredNodes[msg.getSenderId()] = false;
         msg.setRegisteredNodes(registeredNodes);
         sendToAll(msg);
     } 
@@ -87,7 +87,7 @@ public class ProgSpreadNode extends Program {
     public String getText() {
         int count = 0;
         for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
-            if (registeredNodes[i] == 1) {
+            if (registeredNodes[i] == true) {
                 count ++;
             }
             

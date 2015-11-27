@@ -4,7 +4,7 @@ public class Slot {
     
     public static final int STATUS_FREE = 0;
     public static final int STATUS_USED = 1;
-     public static final int STATUS_DONATING = 2;
+    public static final int STATUS_DONATING = 2;
     
     public Slot(int owner, int status) {
         this.owner = owner;
