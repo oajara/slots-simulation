@@ -6,6 +6,6 @@ public class SlotsMessageInitialized extends SlotsMessage{
     
     @Override
     public String getText() {
-        return "Initialized";
+        return "Sender: "+this.getSenderId()+"\nInitialized";
     }
 }

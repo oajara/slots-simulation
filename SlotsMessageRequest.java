@@ -25,7 +25,7 @@ public class SlotsMessageRequest extends SlotsMessage {
     
     @Override
     public String getText() {
-        return "Request Message\nNeed:"+this.need_slots+"\nFree:"+
+        return "Sender: "+this.getSenderId()+"\nRequest Message\nNeed:"+this.need_slots+"\nFree:"+
                 this.free_slots+"\nOwned:"+this.owned_slots+"\n";
     }
 }

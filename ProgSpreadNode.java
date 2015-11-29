@@ -1,5 +1,6 @@
 import daj.Message;
 import daj.Program;
+import java.util.Arrays;
 
 /**
  * Program for each node.
@@ -7,7 +8,7 @@ import daj.Program;
 
 public class ProgSpreadNode extends Program {
     int broadcasted = 0;
-    private boolean[] registeredNodes = new boolean[SlotsDonation.MAX_NODES+1];
+    private final boolean[] registeredNodes = new boolean[SlotsDonation.MAX_NODES+1];
     
     public ProgSpreadNode() {
         /* no nodes at the beggining */
@@ -61,17 +62,31 @@ public class ProgSpreadNode extends Program {
     
     private void processJoin(SpreadMessageJoin msg) { 
         println("Processing Spread JOIN Message from Node " + msg.getSenderId());
+        if(registeredNodes[msg.getSenderId()]) {
+            println("You are already joined, Node " + msg.getSenderId());
+            return;
+        }        
         registeredNodes[msg.getSenderId()] = true;
-        msg.setRegisteredNodes(registeredNodes);
+        msg.setActiveNodes(cloneBitmapTable(registeredNodes));
         sendToAll(msg);
     }
     
     private void processLeave(SpreadMessageLeave msg) { 
         println("Processing Spread LEAVE Message from Node " + msg.getSenderId());
+        if(!registeredNodes[msg.getSenderId()]) {
+            println("You are not joined, Node " + msg.getSenderId());
+            return;
+        }          
         registeredNodes[msg.getSenderId()] = false;
-        msg.setRegisteredNodes(registeredNodes);
+        msg.setRegisteredNodes(cloneBitmapTable(registeredNodes));
         sendToAll(msg);
     } 
+    
+    private boolean[] cloneBitmapTable(boolean[] table) {
+        boolean[] cloneTable;
+        cloneTable = Arrays.copyOf(table, SlotsDonation.MAX_NODES);
+        return cloneTable;       
+    }
       
     
     private void sendToAll(Message msg) {

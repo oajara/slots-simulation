@@ -7,7 +7,7 @@ public class SlotsDonation extends Application {
     public static final int WINH = 600;
     public static final int NODES = 2;
     public static final int MAX_NODES = 4;
-    public static final int TOTAL_SLOTS = 20;
+    public static final int TOTAL_SLOTS = 16;
 
     public static void main(String[] args) {
         new SlotsDonation().run();
@@ -32,7 +32,6 @@ public class SlotsDonation extends Application {
      */
     @Override
     public void construct() {
-        Random random = new Random();
         Node[] nodes;
         
         nodes = new Node[NODES+1];

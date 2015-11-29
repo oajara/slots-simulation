@@ -1,24 +1,22 @@
 public class SpreadMessageJoin extends SpreadMessage {
-    boolean[] registeredNodes;
+    boolean[] activeNodes;
 
     public SpreadMessageJoin(int senderId) {
         super(senderId);
     }
     
-    public SpreadMessageJoin(int senderId, boolean[] registeredNodes) {
+    public SpreadMessageJoin(int senderId, boolean[] activeNodes) {
         super(senderId);
-        this.registeredNodes = registeredNodes;
+        this.activeNodes = activeNodes;
     }    
 
-    public boolean[] getRegisteredNodes() {
-        return registeredNodes;
+    public boolean[] getActiveNodes() {
+        return activeNodes;
     }
 
-    public void setRegisteredNodes(boolean[] registeredNodes) {
-        this.registeredNodes = registeredNodes;
+    public void setActiveNodes(boolean[] activeNodes) {
+        this.activeNodes = activeNodes;
     }
     
-    
-
-    
+ 
 }

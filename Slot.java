@@ -11,6 +11,11 @@ public class Slot {
         this.status = status;
     }
     
+    public Slot(Slot originalSlot) {
+        this.owner = originalSlot.getOwner();
+        this.status = originalSlot.getStatus();
+    }
+    
     public boolean isFree() {
         return (this.status == STATUS_FREE);
     }

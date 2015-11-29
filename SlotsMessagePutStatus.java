@@ -5,7 +5,7 @@ public class SlotsMessagePutStatus extends SlotsMessage{
     
     @Override
     public String getText() {
-        return "Put Status";
+        return "Sender: "+this.getSenderId()+"\nPut Status";
     }
 
     public SlotsMessagePutStatus(Slot[] slotsTable, boolean[] initializedNodes, int senderId) {
