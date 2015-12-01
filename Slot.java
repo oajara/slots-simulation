@@ -5,11 +5,17 @@ public class Slot {
     public static final int STATUS_FREE = 0;
     public static final int STATUS_USED = 1;
     public static final int STATUS_DONATING = 2;
+    public static final int STATUS_UNINIT = 3;
     
     public Slot(int owner, int status) {
         this.owner = owner;
         this.status = status;
     }
+    
+    public Slot() {
+        this.owner = 0;
+        this.status = STATUS_UNINIT;
+    }    
     
     public Slot(Slot originalSlot) {
         this.owner = originalSlot.getOwner();

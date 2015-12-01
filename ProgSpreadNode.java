@@ -12,7 +12,7 @@ public class ProgSpreadNode extends Program {
     
     public ProgSpreadNode() {
         /* no nodes at the beggining */
-        for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
+        for (int i = 0; i <= SlotsDonation.MAX_NODES; i++ ) {
             registeredNodes[i] = false;
         }
     }   
@@ -33,7 +33,6 @@ public class ProgSpreadNode extends Program {
         Message msg = in(index).receive();
         
         if (msg instanceof SpreadMessage) {
-            println("Received Spread Message");
             handleSpreadMessage((SpreadMessage)msg);
         } else {
             handleSlotsMessage((SlotsMessage)msg);
@@ -62,39 +61,41 @@ public class ProgSpreadNode extends Program {
     
     private void processJoin(SpreadMessageJoin msg) { 
         println("Processing Spread JOIN Message from Node " + msg.getSenderId());
-        if(registeredNodes[msg.getSenderId()]) {
+        if(this.isActive(msg.getSenderId())) {
             println("You are already joined, Node " + msg.getSenderId());
             return;
         }        
-        registeredNodes[msg.getSenderId()] = true;
-        msg.setActiveNodes(cloneBitmapTable(registeredNodes));
+        this.registeredNodes[msg.getSenderId()] = true;
+        msg.setActiveNodes(cloneBitmapTable(this.registeredNodes));
         sendToAll(msg);
     }
     
     private void processLeave(SpreadMessageLeave msg) { 
         println("Processing Spread LEAVE Message from Node " + msg.getSenderId());
-        if(!registeredNodes[msg.getSenderId()]) {
+        if(!this.isActive(msg.getSenderId())) {
             println("You are not joined, Node " + msg.getSenderId());
             return;
         }          
-        registeredNodes[msg.getSenderId()] = false;
-        msg.setRegisteredNodes(cloneBitmapTable(registeredNodes));
+        this.registeredNodes[msg.getSenderId()] = false;
+        msg.setRegisteredNodes(cloneBitmapTable(this.registeredNodes));
         sendToAll(msg);
     } 
     
     private boolean[] cloneBitmapTable(boolean[] table) {
         boolean[] cloneTable;
-        cloneTable = Arrays.copyOf(table, SlotsDonation.MAX_NODES);
+        cloneTable = Arrays.copyOf(table, SlotsDonation.MAX_NODES+1);
         return cloneTable;       
     }
       
     
     private void sendToAll(Message msg) {
-        /* send to  all, including requester */
-        println("Sending message to all nodes...");
-        for(int i=0; i<SlotsDonation.NODES; i++){
-            
-            out(i).send(msg);
+        /* send to  all active nodes, including requester */
+        println("Sending message to all active nodes...");
+        for(int i=1; i<SlotsDonation.NODES+1; i++){
+            if(this.isActive(i)) {
+                this.println("... to node#"+i);
+                out(i-1).send(msg); // because link to node n is locate at out(n-1)
+            }
         } 
         broadcasted++;        
     }
@@ -102,7 +103,7 @@ public class ProgSpreadNode extends Program {
     public String getText() {
         int count = 0;
         for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
-            if (registeredNodes[i] == true) {
+            if (this.isActive(i)) {
                 count ++;
             }
             

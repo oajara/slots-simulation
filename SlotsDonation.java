@@ -1,13 +1,12 @@
 import daj.*;
-import java.util.*;
 
 public class SlotsDonation extends Application {
     
     public static final int WINW = 800;
     public static final int WINH = 600;
-    public static final int NODES = 2;
-    public static final int MAX_NODES = 4;
-    public static final int TOTAL_SLOTS = 16;
+    public static final int NODES = 3;
+    public static final int MAX_NODES = 3;
+    public static final int TOTAL_SLOTS = 30;
 
     public static void main(String[] args) {
         new SlotsDonation().run();
@@ -27,9 +26,6 @@ public class SlotsDonation extends Application {
           "TODO: complete this info";
     }
 
-    /**
-     * Create randomly distributed mesh of nodes.
-     */
     @Override
     public void construct() {
         Node[] nodes;
@@ -55,8 +51,6 @@ public class SlotsDonation extends Application {
             link(nodes[i], nodes[0]);
         }          
         
-//        link(nodes[1], nodes[2]);
-//        link(nodes[2], nodes[1]);
     }
     
 }
