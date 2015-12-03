@@ -9,11 +9,14 @@ import java.util.Arrays;
 public class ProgSpreadNode extends Program {
     int broadcasted = 0;
     private final boolean[] registeredNodes = new boolean[SlotsDonation.MAX_NODES+1];
+    private final MessageCounter[] counters = new MessageCounter[SlotsDonation.MAX_NODES+1];
     
     public ProgSpreadNode() {
         /* no nodes at the beggining */
         for (int i = 0; i <= SlotsDonation.MAX_NODES; i++ ) {
             registeredNodes[i] = false;
+            counters[i] = new MessageCounter();
+            counters[i].reset();
         }
     }   
     
@@ -49,11 +52,29 @@ public class ProgSpreadNode extends Program {
     
     private void handleSlotsMessage(SlotsMessage msg) {
         if(isActive(msg.getSenderId())) {
+            this.registerCount(msg);
             sendToAll(msg);
         } else {
             println("Received a Slot message from a non-active node. Discard...");
         }
     }        
+    
+    private void registerCount(SlotsMessage msg) {
+        int sid = msg.getSenderId();
+        if(msg instanceof SlotsMessageRequest) {
+            this.counters[sid].inc(MessageCounter.INDEX_REQUEST);
+        } else if (msg instanceof SlotsMessageDonate) {
+            this.counters[sid].inc(MessageCounter.INDEX_DONATE);
+        } else if (msg instanceof SlotsMessagePutStatus) {
+            this.counters[sid].inc(MessageCounter.INDEX_PUTSTATUS);
+        }  else if (msg instanceof SlotsMessageInitialized) {
+            this.counters[sid].inc(MessageCounter.INDEX_INITIALIZED);
+        } else if (msg instanceof SlotsMessageNewStatus) {
+            this.counters[sid].inc(MessageCounter.INDEX_NEWSTATUS);
+        } else if (msg instanceof SlotsMessageMergeStatus) {
+            this.counters[sid].inc(MessageCounter.INDEX_MERGESTATUS);
+        }         
+    }
     
     private boolean isActive(int nodeId) {
         return registeredNodes[nodeId] == true;
@@ -67,6 +88,7 @@ public class ProgSpreadNode extends Program {
         }        
         this.registeredNodes[msg.getSenderId()] = true;
         msg.setActiveNodes(cloneBitmapTable(this.registeredNodes));
+        this.counters[msg.getSenderId()].inc(MessageCounter.INDEX_JOIN);
         sendToAll(msg);
     }
     
@@ -78,6 +100,7 @@ public class ProgSpreadNode extends Program {
         }          
         this.registeredNodes[msg.getSenderId()] = false;
         msg.setRegisteredNodes(cloneBitmapTable(this.registeredNodes));
+        this.counters[msg.getSenderId()].inc(MessageCounter.INDEX_LEAVE);
         sendToAll(msg);
     } 
     
@@ -102,13 +125,14 @@ public class ProgSpreadNode extends Program {
     
     public String getText() {
         int count = 0;
+        String msgs = new String();
         for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
             if (this.isActive(i)) {
                 count ++;
             }
-            
+            msgs = msgs + "\nNode #" + i + ": " + this.counters[i].asString();
         }
-        return "Active Nodes: " + count+ ".Broadcasted " + broadcasted + " messages so far ";
+        return "Active Nodes: " + count+ "\nMessages: "+msgs;
     }
     
 }

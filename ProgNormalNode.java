@@ -1,5 +1,6 @@
 import daj.Message;
 import daj.Program;
+import daj.GlobalAssertion;
 import java.util.*;
 
 public class ProgNormalNode extends Program {
@@ -14,9 +15,13 @@ public class ProgNormalNode extends Program {
     
     public static final int NO_PRIMARY_MBR = -1;
     
-    public static final int MIN_OWNED_SLOTS = 2;
-    public static final int FREE_SLOTS_LOW = 4;
-    public static final int SLOTS_BY_MSG = 5;
+//    public static final int MIN_OWNED_SLOTS = 16;
+//    public static final int FREE_SLOTS_LOW = 8;
+//    public static final int SLOTS_BY_MSG = 4;
+    
+    public static final int MIN_OWNED_SLOTS = 4;
+    public static final int FREE_SLOTS_LOW = 2;
+    public static final int SLOTS_BY_MSG = 3;    
     
     private final Random random;
     private Slot[] slotsTable = new Slot[SlotsDonation.TOTAL_SLOTS];
@@ -28,6 +33,15 @@ public class ProgNormalNode extends Program {
     private int primaryMember;
     private int maxOwnedSlots;
     private boolean sysBarrier = false;
+    private boolean pendingConnect = false;
+    
+    private int counterForksSucceded = 0;
+    private int counterForksFailed = 0;
+    private int counterExits = 0;
+    private int counterConnects = 0;
+    private int counterDisconnects = 0;
+    
+    private NumberOfSlots slotsAssertion;
     
     public ProgNormalNode(int id) { 
         this.random = new Random();
@@ -44,6 +58,10 @@ public class ProgNormalNode extends Program {
         this.slotsLoop();
     }
     
+    public void setSlotsAssertion(NumberOfSlots assertion) {
+        this.slotsAssertion = assertion;
+    }
+    
     private void handleSpreadDisconnect(SpreadMessageLeave msg) {
         this.println("Handling Spread Leave");
         
@@ -53,6 +71,7 @@ public class ProgNormalNode extends Program {
         
         if( disc_mbr == this.nodeId){ /* The own LEAVE message	*/
             this.println("Received my own Leave message");
+            this.initGlobalVars();
             this.state = STS_DISCONNECTED;
             return;
         }
@@ -60,8 +79,8 @@ public class ProgNormalNode extends Program {
 	/* if local_nodeid is not initialized and is the only surviving node , restart all*/
 	if(!this.isInitialized() && this.getActiveNodes() == 1) {
 		this.initGlobalVars();
-		this.disconnect();
-		this.connect();
+		this.doDisconnect();
+		this.doConnect();
 		return;
 	}     
         
@@ -86,8 +105,8 @@ public class ProgNormalNode extends Program {
                     this.println("primary_mbr == NO_PRIMARY_MBR");
                     this.state = STS_NEW;
                     this.initGlobalVars();
-                    this.disconnect();
-                    this.connect();
+                    this.doDisconnect();
+                    this.doConnect();
                     return;
             }		
 	}     
@@ -106,18 +125,13 @@ public class ProgNormalNode extends Program {
                     this.slotsTable[i].setOwner(this.nodeId);
                     this.slotsTable[i].setStatus(Slot.STATUS_FREE);
                 } else {
-                    this.slotsTable[i].setOwner(this.primaryMember);
-                    if( this.primaryMember == this.nodeId){
-                        /* The local node is the new primary and 
-                         * has inherit disconnected members slots
-                         * if it has not any slot it is blocked waiting for them.
-                         * therefore, now SYSTASK must be signaled 
-                         */
-                        if( (this.state == STS_REQ_SLOTS) &&
-                                (this.getOwnedSlots() == 0)){
-                                this.state = STS_RUNNING;
-                        }
+                    if( this.primaryMember == this.nodeId && 
+                            this.state == STS_REQ_SLOTS && 
+                            this.getOwnedSlots() == 0) {
+                        this.state = STS_RUNNING;
+                        this.sysBarrier = true;
                     }
+                    this.slotsTable[i].setOwner(this.primaryMember);
                 }
             }
 	}
@@ -136,7 +150,7 @@ public class ProgNormalNode extends Program {
         this.println("Handling Spread Join");
         
         /* update registered nodes table */
-        this.activeNodes = msg.getActiveNodes(); 
+        this.activeNodes = this.cloneBitmapTable(msg.getActiveNodes()); 
         
         if (this.getActiveNodes() < 0) {
             return;
@@ -160,7 +174,9 @@ public class ProgNormalNode extends Program {
                 for (int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
                     slotsTable[i].setOwner(this.nodeId);
                     slotsTable[i].setStatus(Slot.STATUS_FREE);
-                }   
+                } 
+                
+                this.sysBarrier = true;
                 
             } else {
                 /* Waiting Global status info */
@@ -298,8 +314,19 @@ public class ProgNormalNode extends Program {
             return;
 	}        
 
-	/* Change the owner of the donated slots */
         int[] donatedList = msg.getDonatedIdList().clone();
+        
+        /* this is for me */
+	if( this.state == STS_REQ_SLOTS && donatedList.length > 0 
+                && msg.getRequester() == this.nodeId) {
+            this.state = STS_RUNNING;
+            if( this.getOwnedSlots() == 0){ /* a new member without slots */
+                    this.println("Wake up fork/exit");
+                    this.sysBarrier = true;	/* Wakeup SYSTASK 		*/	
+            }            
+	}	
+        
+	/* Change the owner of the donated slots */
 	for( int j = 0; j < donatedList.length; j++) {
 		int slotId = donatedList[j];
 		this.slotsTable[slotId].setOwner(msg.getRequester());
@@ -310,15 +337,6 @@ public class ProgNormalNode extends Program {
         if(msg.getRequester() != this.nodeId){
             return;
         }
-
-        /* this is for me */
-	if( this.state == STS_REQ_SLOTS && donatedList.length > 0) {
-            this.state = STS_RUNNING;
-            if( this.getOwnedSlots() == 0){ /* a new member without slots */
-                    this.println("Wake up fork/exit");
-                    this.sysBarrier = true;	/* Wakeup SYSTASK 		*/	
-            }            
-	}	
 
         this.donorsNodes[msg.getSenderId()] = false;
 	this.println("free_slots="+this.getFreeSlots()+" free_slots_low="
@@ -484,7 +502,7 @@ public class ProgNormalNode extends Program {
                     }  else if (msg instanceof SlotsMessageInitialized) {
                         this.handleSlotsInitialized((SlotsMessageInitialized)msg);
                     } else if (msg instanceof SlotsMessageNewStatus) {
-                        mbr = ((SlotsMessagePutStatus)msg).getSenderId();
+                        mbr = ((SlotsMessageNewStatus)msg).getSenderId();
                         this.primaryMember = mbr;
                         this.handleSlotsNewStatus((SlotsMessageNewStatus)msg);
                     } else if (msg instanceof SlotsMessageMergeStatus) {
@@ -497,6 +515,7 @@ public class ProgNormalNode extends Program {
                 }
             }
             this.processStuff();
+            test((GlobalAssertion)this.slotsAssertion);
         }    
     }
  
@@ -504,12 +523,15 @@ public class ProgNormalNode extends Program {
     @Override
     public String getText() {
         return "Node #" + nodeId + "\nStatus: "+ this.getStateAsString() 
-                +"\nI own: "+ getSlotsNumber() + " ("+this.getFreeSlots()+
+                +"\nI own: "+ this.getOwnedSlots() + " ("+this.getFreeSlots()+
                 " free) slots\nmaxOwnedSlots: "+this.maxOwnedSlots+"\n"
                 + "FSL: "+FREE_SLOTS_LOW+ "\nRegistered Nodes: "
                 + Arrays.toString(this.activeNodes)+"\nInitialized Nodes: "
                 + Arrays.toString(this.initializedNodes)+"\nDonor Nodes: "
-                + Arrays.toString(this.donorsNodes);
+                + Arrays.toString(this.donorsNodes)+"\nForks Succeded: "+this.counterForksSucceded
+                +"\nForks Failed: "+this.counterForksFailed
+                +"\nExits: "+this.counterExits+"\nConnects: "+this.counterConnects
+                +"\nDisconnects: "+this.counterDisconnects;
     }
     
     public void println(String str) {
@@ -536,16 +558,6 @@ public class ProgNormalNode extends Program {
         }           
     }
 
-    public int getSlotsNumber() {
-        int counter = 0;
-        for(int i = 0; i<SlotsDonation.TOTAL_SLOTS; i++) {
-            if(slotsTable[i].getOwner() == this.nodeId) {
-                counter++;
-            }
-        }        
-        return counter;
-    }
-    
     private int getPrimaryMember() {
         for(int i = 1; i < SlotsDonation.NODES; i++ ) {
             if (this.isInitialized(i)) {
@@ -619,7 +631,7 @@ public class ProgNormalNode extends Program {
         return counter;
     }   
     
-    private int getOwnedSlots() {
+    public int getOwnedSlots() {
         int counter = 0;
         for(int i = 0; i<SlotsDonation.TOTAL_SLOTS; i++) {
             if(slotsTable[i].getOwner() == this.nodeId) {
@@ -649,27 +661,35 @@ public class ProgNormalNode extends Program {
             case 0:
                 if(this.isConnected() && this.isInitialized() && this.sysBarrier) {
                     this.doFork();
+                } else {
+                    println("cannot fork");
                 }
                 break;
             case 1:
                 if (this.isConnected() && this.isInitialized() && this.getUsedSlots() > 0 && this.sysBarrier) {
                     this.doExit();
+                }  else {
+                    println("cannot exit");
                 }
                 break;
             case 3:
 //                if (this.isConnected()) {
-//                    this.disconnect();
+//                    this.doDisconnect();
+//                }  else {
+//                    println("cannot disconnect");
 //                }
                 break;
             case 2:
-                if (!this.isConnected()) {
-                    this.connect();
-                }                    
+                if (!this.isConnected() && !this.pendingConnect) {
+                    this.doConnect();
+                }  else {
+                    println("cannot connect");
+                }                   
                 break;
 //                case 4:
 //                    break;
             default:
-                //println("Doing nothing...");
+                println("Doing nothing...");
                 break;
         }
     }
@@ -678,22 +698,25 @@ public class ProgNormalNode extends Program {
         return (this.activeNodes[this.nodeId]);
     }
     
-    private void connect() {
+    private void doConnect() {
         println("Connecting...");
+        this.pendingConnect = true;
+        this.counterConnects++;
         out(0).send(new SpreadMessageJoin(this.nodeId));
     }
     
-    private void disconnect() {
+    private void doDisconnect() {
         println("Disconnecting...");
         this.initGlobalVars();
         this.state = STS_DISCONNECTED;
+        this.counterDisconnects++;
         out(0).send(new SpreadMessageLeave(this.nodeId));
     }    
     
     private int getActiveNodes() {
         int counter = 0;
         for(int i = 0; i <= SlotsDonation.MAX_NODES; i++) {
-            if(activeNodes[i] == true) {
+            if(this.activeNodes[i] == true) {
                 counter++;
             }
         }        
@@ -716,6 +739,7 @@ public class ProgNormalNode extends Program {
         this.cleanNodesLists();    
         this.cleanSlotsLists();
         this.sysBarrier = false;
+        this.pendingConnect = false;
         this.maxOwnedSlots = 0;
     }
     
@@ -731,7 +755,7 @@ public class ProgNormalNode extends Program {
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
             this.slotsTable[i] = new Slot();
         }          
-    }      
+    }    
     
     private Slot[] cloneSlotTable(Slot[] table) {
         Slot[] cloneTable = new Slot[SlotsDonation.TOTAL_SLOTS];
@@ -776,10 +800,12 @@ public class ProgNormalNode extends Program {
 	
 	if(this.getFreeSlots() == 0) {
             //7this.println("No frees slot");
+            this.counterForksFailed++;
             return(false);
 	} else {
             //println("Free slot found, forking");
             this.markSlotUsed();
+            this.counterForksSucceded++;
             return (true);
         }        
     }
@@ -787,6 +813,7 @@ public class ProgNormalNode extends Program {
     public void doExit() {
         //println("Executing exit of a process");
         this.markSlotFree();
+        this.counterExits++;
     }
    
 }
