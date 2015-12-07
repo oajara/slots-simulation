@@ -86,6 +86,10 @@ public abstract class Applic extends Applet implements ActionListener {
 		if (visualized) start();
 		network.run();
 	}
+        
+        public void writeInfo() {
+            (SlotsDonation(this)).writeInfo();
+        }        
 
 	// --------------------------------------------------------------------------
 	// executed when run in applet mode; create button to start application

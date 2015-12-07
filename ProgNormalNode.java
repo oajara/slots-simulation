@@ -59,6 +59,11 @@ public class ProgNormalNode extends Program {
         this.slotsLoop();
     }
     
+    public void getInfoLine() {
+        //(NodeId, Forks OK, Forks Failed, Exits)
+        System.out.println(""+this.nodeId+','+this.counterForksSucceded+','+this.counterForksFailed+','+this.counterExits);
+    }
+    
    
     private void handleSpreadDisconnect(SpreadMessageLeave msg) {
         this.println("Handling Spread Leave");
@@ -246,10 +251,13 @@ public class ProgNormalNode extends Program {
             println("free_slots="+ this.getFreeSlots()+" free_slots_low="+FREE_SLOTS_LOW
                     +" needed_slots="+msg.getNeedSlots()+" don_nodes="+don_nodes
                     +" surplus="+surplus);
-            if( surplus > (msg.getNeedSlots()/(float)don_nodes) ) {  /* donate the slots requested  */
-                donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
+//            if( surplus > (msg.getNeedSlots()/(float)don_nodes) ) {  /* donate the slots requested  */
+            if( surplus > msg.getNeedSlots()) {  /* donate the slots requested  */
+                
+//                donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
 //                donated_slots = Math.ceil((msg.getNeedSlots()/(float)don_nodes))*
 //                        Math.ceil((surplus/(float)FREE_SLOTS_LOW));
+                donated_slots = Math.ceil(msg.getNeedSlots() * surplus / (float)this.maxOwnedSlots);
             } else if( surplus > (FREE_SLOTS_LOW/(float)don_nodes) ) {
                 /* donate slots at least up to complete the minimal number of free slots */
                 donated_slots = Math.ceil((FREE_SLOTS_LOW/(float)don_nodes));

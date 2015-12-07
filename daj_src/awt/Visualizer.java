@@ -7,6 +7,7 @@
 // --------------------------------------------------------------------------
 package daj.awt;
 
+
 import java.applet.AppletContext;
 import java.awt.Button;
 import java.awt.Color;
@@ -47,7 +48,7 @@ public class Visualizer extends Frame implements ActionListener, ComponentListen
 	// network that is visualized
 	private Network network;
 	// buttons arranged in a panel
-	private Button cont, walk, stop, step, redraw, restart, quit;
+	private Button cont, walk, stop, step, redraw, restart, quit, write;
 	private Panel buttons;
 	// the menu bar
 	private MenuBar menubar;
@@ -110,6 +111,7 @@ public class Visualizer extends Frame implements ActionListener, ComponentListen
 		step = new Button("Step");
 		redraw = new Button("Redraw");
 		restart = new Button("Reset");
+                write = new Button("Write");
 		quit = new Button("Quit");
 		// set button states
 		stop.setEnabled(false);
@@ -123,6 +125,7 @@ public class Visualizer extends Frame implements ActionListener, ComponentListen
 		redraw.setFont(font);
 		restart.setFont(font);
 		quit.setFont(font);
+                write.setFont(font);
 		// set button colors
 		cont.setForeground(Color.green.darker().darker().darker());
 		walk.setForeground(Color.green.darker().darker().darker());
@@ -162,10 +165,12 @@ public class Visualizer extends Frame implements ActionListener, ComponentListen
 				GridBagConstraints.CENTER, 1.0, 0.0, 0, 0, 0, 0);
 		add(buttons, redraw, 0, 4, 1, 1, GridBagConstraints.HORIZONTAL,
 				GridBagConstraints.SOUTH, 1.0, 1.0, 0, 0, 0, 0);
-		add(buttons, restart, 0, 5, 1, 1, GridBagConstraints.HORIZONTAL,
+		add(buttons, restart, 0, 6, 1, 1, GridBagConstraints.HORIZONTAL,
 				GridBagConstraints.SOUTH, 1.0, 0.0, 0, 0, 0, 0);
-		add(buttons, quit, 0, 6, 1, 1, GridBagConstraints.HORIZONTAL,
+		add(buttons, quit, 0, 7, 1, 1, GridBagConstraints.HORIZONTAL,
 				GridBagConstraints.SOUTH, 1.0, 0.0, 0, 0, 0, 0);
+		add(buttons, write, 0, 5, 1, 1, GridBagConstraints.HORIZONTAL,
+				GridBagConstraints.SOUTH, 1.0, 0.0, 0, 0, 0, 0);                
 		// create label
 		message = new Label("Network is in initial state.", Label.LEFT);
 		status = new Panel();
@@ -202,6 +207,7 @@ public class Visualizer extends Frame implements ActionListener, ComponentListen
 		redraw.addActionListener(this);
 		restart.addActionListener(this);
 		quit.addActionListener(this);
+                write.addActionListener(this);
 		alg.addActionListener(this);
 		about.addActionListener(this);
 		home.addActionListener(this);
@@ -305,6 +311,11 @@ public class Visualizer extends Frame implements ActionListener, ComponentListen
 			if (application.isApplet()) application.terminate();
 			else System.exit(0);
 		}
+		else if (target == write) {
+                        setText("Writing lien to console");
+			application.writeInfo();
+                    
+		}                
 		else if (target == alg) {
 			if (alginfo == null) {
 				alginfo =

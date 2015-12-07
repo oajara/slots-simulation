@@ -1,4 +1,7 @@
+//package daj;
 import daj.*;
+import java.io.*; 
+
 
 public class SlotsDonation extends Application {
     
@@ -21,13 +24,22 @@ public class SlotsDonation extends Application {
     public SlotsDonation() {
         super("Slots Donation Algorithm", WINW, WINH);
     }
+    
+    public void writeInfo() {
+        System.out.println("Joins, Leaves, Requests, Donates, Inits, PutStatus, NewStatus, MergeStatus");
+        ((ProgSpreadNode)(this.nodes[0].getProgram())).getInfoLine();
+        System.out.println("NodeId, ForksOK, ForksFail, Exits");
+        for(int i = 1; i < this.nodes.length; i++) {
+            ((ProgNormalNode)(this.nodes[i].getProgram())).getInfoLine();
+        }
+    }
 
     @Override
     public String getText() {
         return "Slots Donation Algorithm\n \n" +
           "TODO: complete this info";
     }
-
+    
     @Override
     public void construct() {
         

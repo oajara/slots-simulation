@@ -126,6 +126,30 @@ public class ProgSpreadNode extends Program {
         broadcasted++;        
     }
     
+    public void getInfoLine() {
+        //(NodeId, Forks OK, Forks Failed, Exits)
+        //System.out.println("0,"+this.
+        int counters[] = new int[8];
+        for(int j = 0; j <= 7; j++) { //type of message
+            counters[j] = 0;
+            for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) { //node#
+                counters[j] = this.counters[i].get(j) + counters[j];
+            }
+        }
+//        INDEX_JOIN = 0;
+//        INDEX_LEAVE = 1;
+//        INDEX_REQUEST = 2;
+//        INDEX_DONATE = 3;
+//        INDEX_INITIALIZED = 4;
+//        INDEX_PUTSTATUS = 5;
+//        INDEX_NEWSTATUS = 6;
+//        INDEX_MERGESTATUS = 7;
+        System.out.println(""+counters[MessageCounter.INDEX_JOIN]+","+counters[MessageCounter.INDEX_LEAVE]+","
+        +counters[MessageCounter.INDEX_REQUEST]+","+counters[MessageCounter.INDEX_DONATE]+","
+        +counters[MessageCounter.INDEX_INITIALIZED]+","+counters[MessageCounter.INDEX_PUTSTATUS]+","
+        +counters[MessageCounter.INDEX_NEWSTATUS]+","+counters[MessageCounter.INDEX_MERGESTATUS]);
+    }    
+    
     public String getText() {
         int count = 0;
         String msgs = new String();
