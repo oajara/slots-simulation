@@ -10,4 +10,9 @@ public abstract class SlotsMessage extends Message {
     public int getSenderId() {
         return senderId;
     }
+    
+    @Override
+    public String getText() {
+        return "Type : "+ this.getClass().toString();
+    }    
 }

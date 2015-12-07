@@ -35,9 +35,12 @@ public class ProgSpreadNode extends Program {
         int index = in().select();
         Message msg = in(index).receive();
         
+        
         if (msg instanceof SpreadMessage) {
+            println("Receive "+ msg.getClass().toString() +" from Node#"+ ((SpreadMessage)msg).getSenderId());
             handleSpreadMessage((SpreadMessage)msg);
         } else {
+            println("Receive "+ msg.getClass().toString() +" from Node#"+ ((SlotsMessage)msg).getSenderId());
             handleSlotsMessage((SlotsMessage)msg);
         }
     }
@@ -113,10 +116,10 @@ public class ProgSpreadNode extends Program {
     
     private void sendToAll(Message msg) {
         /* send to  all active nodes, including requester */
-        println("Sending message to all active nodes...");
+        //println("Sending message to all active nodes...");
         for(int i=1; i<SlotsDonation.NODES+1; i++){
             if(this.isActive(i)) {
-                this.println("... to node#"+i);
+                //this.println("... to node#"+i);
                 out(i-1).send(msg); // because link to node n is locate at out(n-1)
             }
         } 

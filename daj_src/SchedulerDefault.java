@@ -17,6 +17,9 @@ public class SchedulerDefault extends Scheduler {
 	public int nextProgram() {
 		int n = getNumber();
 		boolean reset = false;
+                if(isReady(0)) {
+                    return 0;
+                }                     
 		do {
 			incTime();
 			last++;

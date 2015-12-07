@@ -5,10 +5,10 @@ import daj.Node;
 class NumberOfSlots extends GlobalAssertion {
     
   private Node[] nodes;
-  
+  int count = 0;
     
   public String getText() {
-    return "Na na na na";
+    return "TOTAL is "+SlotsDonation.TOTAL_SLOTS + " while sum is "+count;
   }
   
   public NumberOfSlots(Node[] nodes) {
@@ -17,10 +17,10 @@ class NumberOfSlots extends GlobalAssertion {
 
   @Override
   public boolean test(Program[] p) {
-    int count = 0;
+      count = 0;
     for (int j = 1; j < this.nodes.length; j++) {
         count = ((ProgNormalNode)(this.nodes[j].getProgram())).getOwnedSlots() + count;
     }
-    return count <= SlotsDonation.TOTAL_SLOTS;
+    return count <= SlotsDonation.TOTAL_SLOTS || count == 0;
   }
 }

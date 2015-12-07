@@ -2,14 +2,11 @@ import daj.*;
 
 public class SlotsDonation extends Application {
     
-    public static final int WINW = 1024;
-    public static final int WINH = 300;
-//    public static final int NODES = 32;
-//    public static final int MAX_NODES = 32;
-//    public static final int TOTAL_SLOTS = 2048;
-    public static final int NODES = 2;    
-    public static final int MAX_NODES = 2;
-    public static final int TOTAL_SLOTS = 20;    
+    public static final int WINW = 1200;
+    public static final int WINH = 400;
+    public static final int NODES = 16;
+    public static final int MAX_NODES = 16;
+    public static final int TOTAL_SLOTS = 2048;
     
     private Node[] nodes;
 
@@ -56,9 +53,11 @@ public class SlotsDonation extends Application {
         }
         
         /* assertion object */
-        for(int i=1; i<=NODES; i++){
-             ((ProgNormalNode)this.nodes[i].getProgram()).setSlotsAssertion(new NumberOfSlots(this.nodes));
-        }        
+//        for(int i=1; i<=NODES; i++){
+//             ((ProgNormalNode)this.nodes[i].getProgram()).setSlotsAssertion(new NumberOfSlots(this.nodes));
+//        }
+        
+//        this.setScheduler(new SlotsScheduler());
         
     }
     
