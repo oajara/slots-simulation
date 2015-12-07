@@ -6,6 +6,7 @@
 // http://www.risc.uni-linz.ac.at/software/daj
 // --------------------------------------------------------------------------
 package daj.awt;
+import SlotsDonation;
 
 import java.applet.Applet;
 import java.awt.Button;

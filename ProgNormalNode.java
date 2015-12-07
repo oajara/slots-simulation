@@ -17,7 +17,7 @@ public class ProgNormalNode extends Program {
     
     public static final int MIN_OWNED_SLOTS = 8;
     public static final int FREE_SLOTS_LOW = 4;
-    public static final int SLOTS_BY_MSG = 2048;
+    public static final int SLOTS_BY_MSG = 1024;
     
 //    public static final int MIN_OWNED_SLOTS = 4;
 //    public static final int FREE_SLOTS_LOW = 2;
@@ -35,6 +35,8 @@ public class ProgNormalNode extends Program {
     private boolean sysBarrier = false;
     private boolean pendingConnect = false;
     
+    private boolean gotAtLeastOne = false;
+    
     private int counterForksSucceded = 0;
     private int counterForksFailed = 0;
     private int counterExits = 0;
@@ -43,6 +45,9 @@ public class ProgNormalNode extends Program {
     private int counterRequestedSlots = 0;
     private int counterGotSlots = 0;
     private int counterDonatedSlots = 0;
+    private int counterGotZeroSlots = 0;
+    private int[] counterGotFirstSlotAt = new int[SlotsDonation.MAX_NODES-1];
+    private int counterAtMessage = 0;
     
     public ProgNormalNode(int id) { 
         this.random = new Random();
@@ -55,13 +60,21 @@ public class ProgNormalNode extends Program {
     
     @Override
     public void main()  {
+        int number;
+
+        number = this.random.nextInt(SlotsDonation.MAX_NODES);        
+        println("Sleeping: "+number);
+        sleep(number);
+	this.doConnect();
         // Start with algorithm
         this.slotsLoop();
     }
     
     public void getInfoLine() {
-        //(NodeId, Forks OK, Forks Failed, Exits)
-        System.out.println(""+this.nodeId+','+this.counterForksSucceded+','+this.counterForksFailed+','+this.counterExits);
+        //(NodeId, Forks OK, Forks Failed, Exits, TotalRequested, TotalReceived, GotZero)
+        System.out.println(""+this.nodeId+','+this.counterForksSucceded+','+
+                this.counterForksFailed+','+this.counterExits+','+this.counterRequestedSlots+
+                ','+this.counterGotSlots+','+this.counterGotZeroSlots);
     }
     
    
@@ -349,7 +362,17 @@ public class ProgNormalNode extends Program {
                 this.slotsTable[slotId].setStatus(Slot.STATUS_FREE);
                 if(msg.getRequester() == this.nodeId){
                     this.counterGotSlots++;
-        }	}
+                    if(!this.gotAtLeastOne) {
+                        this.gotAtLeastOne = true;
+                        this.counterGotFirstSlotAt[this.counterAtMessage]++;
+                    } 
+                    
+                }
+        }
+        
+        if(msg.getRequester() == this.nodeId){
+            this.counterAtMessage++;
+        }
 
 	/* If the slots are for other node, returns */
         if(msg.getRequester() != this.nodeId){
@@ -365,6 +388,11 @@ public class ProgNormalNode extends Program {
         if( this.state == STS_REQ_SLOTS && this.countActive(this.donorsNodes) == 0) {
             mbrRqstSlots(MIN_OWNED_SLOTS);
         }
+        
+        if (this.countActive(this.donorsNodes) == 0 && this.gotAtLeastOne == false) {
+            this.counterGotZeroSlots++;
+        } 
+        
 
     }
     
@@ -468,6 +496,8 @@ public class ProgNormalNode extends Program {
         SlotsMessageRequest msg = new SlotsMessageRequest(nr_slots,
                 this.getFreeSlots(), this.getOwnedSlots(), this.nodeId);
         this.counterRequestedSlots = nr_slots + this.counterRequestedSlots;
+        this.gotAtLeastOne = false;
+        this.counterAtMessage = 0;
         this.broadcast(msg);
     } 
     
@@ -667,17 +697,20 @@ public class ProgNormalNode extends Program {
         int action, number;
 
         number = this.random.nextInt(1000);
-        if(number >= 0 && number < 450) {
+        if(number >= 0 && number < 600) {
             action = 0;
-        } else if (number >= 450 && number < 900) {
+        } else if (number >= 600 && number < 1000) {
             action = 1;
-        } else if (number >= 900 && number < 999) {
-            action = 2;
-        } else if (number >= 999 && number < 1000) {
-            action = 3;
         } else {
-            action = 4;
+            action = -1;
         }
+//        else if (number >= 900 && number < 999) {
+//            action = 2;
+//        } else if (number >= 999 && number < 1000) {
+//            action = 3;
+//        } else {
+//            action = 4;
+//        }
 
         switch(action) {
             case 0:
@@ -758,6 +791,7 @@ public class ProgNormalNode extends Program {
 	this.primaryMember = NO_PRIMARY_MBR;
         this.cleanNodesLists();    
         this.cleanSlotsLists();
+        this.cleanCounterGotFirstAt();
         this.sysBarrier = false;
         this.pendingConnect = false;
         this.maxOwnedSlots = 0;
@@ -770,6 +804,12 @@ public class ProgNormalNode extends Program {
             this.donorsNodes[i] = false;
         }          
     } 
+    
+    private void cleanCounterGotFirstAt() {
+        for(int i = 0; i < SlotsDonation.MAX_NODES-1; i++) {
+            this.counterGotFirstSlotAt[i] = 0;
+        }          
+    }     
     
     private void cleanSlotsLists() {
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
@@ -836,4 +876,7 @@ public class ProgNormalNode extends Program {
         this.counterExits++;
     }
    
+    public int[] getCounterGotFirstAt() {
+        return this.counterGotFirstSlotAt;
+    }
 }

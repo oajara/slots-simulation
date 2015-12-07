@@ -1,5 +1,6 @@
 import daj.Message;
 import daj.Program;
+import daj.Node;
 import java.util.Arrays;
 
 /**
@@ -10,6 +11,7 @@ public class ProgSpreadNode extends Program {
     int broadcasted = 0;
     private final boolean[] registeredNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private final MessageCounter[] counters = new MessageCounter[SlotsDonation.MAX_NODES+1];
+    private Node[] nodeList;
     
     public ProgSpreadNode() {
         /* no nodes at the beggining */
@@ -25,6 +27,11 @@ public class ProgSpreadNode extends Program {
         while(true)
             receiveFromAll();
     }
+    
+    public void setNodeList(Node[] nodeList) {
+        this.nodeList = nodeList;
+    }
+        
     
     private void println(String str) {
         System.out.println("Node[SP]: "+str);
@@ -126,7 +133,9 @@ public class ProgSpreadNode extends Program {
         broadcasted++;        
     }
     
+
     public void getInfoLine() {
+        int[] counterGotFirstSlotAt = new int[SlotsDonation.MAX_NODES-1];
         //(NodeId, Forks OK, Forks Failed, Exits)
         //System.out.println("0,"+this.
         int counters[] = new int[8];
@@ -136,6 +145,7 @@ public class ProgSpreadNode extends Program {
                 counters[j] = this.counters[i].get(j) + counters[j];
             }
         }
+        
 //        INDEX_JOIN = 0;
 //        INDEX_LEAVE = 1;
 //        INDEX_REQUEST = 2;
@@ -148,6 +158,20 @@ public class ProgSpreadNode extends Program {
         +counters[MessageCounter.INDEX_REQUEST]+","+counters[MessageCounter.INDEX_DONATE]+","
         +counters[MessageCounter.INDEX_INITIALIZED]+","+counters[MessageCounter.INDEX_PUTSTATUS]+","
         +counters[MessageCounter.INDEX_NEWSTATUS]+","+counters[MessageCounter.INDEX_MERGESTATUS]);
+        
+        
+        
+        for(int n = 1; n <= SlotsDonation.MAX_NODES; n++) {
+            for(int c = 0; c < SlotsDonation.MAX_NODES-1; c++) {
+                counterGotFirstSlotAt[c] += ((ProgNormalNode)(this.nodeList[n].getProgram())).getCounterGotFirstAt()[c];
+            }
+        }  
+        
+        System.out.println("At Message,Counter");
+        for(int c = 0; c < SlotsDonation.MAX_NODES-1; c++) {
+           System.out.println(""+(c+1)+","+ counterGotFirstSlotAt[c]);
+        }        
+        
     }    
     
     public String getText() {

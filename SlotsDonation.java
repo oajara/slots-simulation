@@ -5,11 +5,11 @@ import java.io.*;
 
 public class SlotsDonation extends Application {
     
-    public static final int WINW = 1200;
-    public static final int WINH = 400;
-    public static final int NODES = 16;
-    public static final int MAX_NODES = 16;
-    public static final int TOTAL_SLOTS = 2048;
+    public static final int WINW = 1500;
+    public static final int WINH = 900;
+    public static final int NODES = 64;
+    public static final int MAX_NODES = 64;
+    public static final int TOTAL_SLOTS = 1024;
     
     private Node[] nodes;
 
@@ -26,9 +26,12 @@ public class SlotsDonation extends Application {
     }
     
     public void writeInfo() {
+        System.out.println("Run Params: \nNR_NODES: "+NODES+"\nSLOTS: "+TOTAL_SLOTS+
+                "\nMIN_OWNED_SLOTS: "+ProgNormalNode.MIN_OWNED_SLOTS+"\nFREE_SLOTS_LOW: "+
+                ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG);
         System.out.println("Joins, Leaves, Requests, Donates, Inits, PutStatus, NewStatus, MergeStatus");
         ((ProgSpreadNode)(this.nodes[0].getProgram())).getInfoLine();
-        System.out.println("NodeId, ForksOK, ForksFail, Exits");
+        System.out.println("NodeId, ForksOK, ForksFail, Exits, TotalRequested, TotalReceived, GotZero");
         for(int i = 1; i < this.nodes.length; i++) {
             ((ProgNormalNode)(this.nodes[i].getProgram())).getInfoLine();
         }
@@ -36,6 +39,7 @@ public class SlotsDonation extends Application {
 
     @Override
     public String getText() {
+        this.writeInfo();
         return "Slots Donation Algorithm\n \n" +
           "TODO: complete this info";
     }
@@ -49,6 +53,9 @@ public class SlotsDonation extends Application {
         this.nodes[0] = node(new ProgSpreadNode(), "Spread Node",
                      //Math.abs(random.nextInt()) % WINW, Math.abs(random.nextInt()) % WINH);
                      WINW / 2, (int) Math.round(WINH * 0.9));
+        
+        //assign nodes list to spread node
+        ((ProgSpreadNode)(this.nodes[0].getProgram())).setNodeList(nodes);
         
         /* create normal nodes from index one */
         int gap = (int) Math.round(WINW / (NODES+1));
