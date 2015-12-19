@@ -17,7 +17,7 @@ public class ProgNormalNode extends Program {
     
     public static final int MIN_OWNED_SLOTS = 8;
     public static final int FREE_SLOTS_LOW = 4;
-    public static final int SLOTS_BY_MSG = 1024;
+    public static final int SLOTS_BY_MSG = 2048;
     
 //    public static final int MIN_OWNED_SLOTS = 4;
 //    public static final int FREE_SLOTS_LOW = 2;
