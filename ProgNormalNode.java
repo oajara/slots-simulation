@@ -17,7 +17,7 @@ public class ProgNormalNode extends Program {
     
     public static final int MIN_OWNED_SLOTS = 8;
     public static final int FREE_SLOTS_LOW = 4;
-    public static final int SLOTS_BY_MSG = 2048;
+    public static final int SLOTS_BY_MSG = 1024;
     
 //    public static final int MIN_OWNED_SLOTS = 4;
 //    public static final int FREE_SLOTS_LOW = 2;
@@ -28,6 +28,7 @@ public class ProgNormalNode extends Program {
     private boolean[] activeNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] initializedNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] donorsNodes = new boolean[SlotsDonation.MAX_NODES+1];
+    private boolean[] bmPendingNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private final int nodeId;
     private int state = STS_DISCONNECTED;
     private int primaryMember;
@@ -81,6 +82,15 @@ public class ProgNormalNode extends Program {
     private void handleSpreadDisconnect(SpreadMessageLeave msg) {
         this.println("Handling Spread Leave");
         
+	/* Clear those INITIALIZED members until SYS_PUT_STATUS arrives */
+	/* because the primary member will send a new SYS_PUT_STATUS 	*/
+	if(this.state == STS_WAIT_STATUS) {
+            for(int i = 1; i <= SlotsDonation.MAX_NODES; i++) {
+                this.initializedNodes[i] = false;
+            }  
+            return;
+	}        
+        
         int disc_mbr = msg.getSenderId();
         
         this.activeNodes = this.cloneBitmapTable(msg.getRegisteredNodes());
@@ -110,6 +120,10 @@ public class ProgNormalNode extends Program {
         
 	/* verify if the local member is waiting a donation from the disconnected node */
         this.donorsNodes[disc_mbr] = false;
+        
+	
+	/* Are there any pending ZERO reply for that dead node ? */
+        this.bmPendingNodes[disc_mbr] = false;
         
 	/* if the dead node was the primary_mbr, search another primary_mbr */
 	if( this.primaryMember == disc_mbr) {
@@ -257,6 +271,12 @@ public class ProgNormalNode extends Program {
         if( this.state != STS_RUNNING) {
             donated_slots = 0;
         } else {
+            if (this.countActive(this.donorsNodes) > 0) {
+                println("concurrent request");
+                this.donorsNodes[requester] = false;
+                return;
+            }
+            
             don_nodes = this.getInitializedNodes() - 1;
             assert( don_nodes > 0);
 
@@ -264,24 +284,27 @@ public class ProgNormalNode extends Program {
             println("free_slots="+ this.getFreeSlots()+" free_slots_low="+FREE_SLOTS_LOW
                     +" needed_slots="+msg.getNeedSlots()+" don_nodes="+don_nodes
                     +" surplus="+surplus);
-//            if( surplus > (msg.getNeedSlots()/(float)don_nodes) ) {  /* donate the slots requested  */
             if( surplus > msg.getNeedSlots()) {  /* donate the slots requested  */
-                
-//                donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
-//                donated_slots = Math.ceil((msg.getNeedSlots()/(float)don_nodes))*
-//                        Math.ceil((surplus/(float)FREE_SLOTS_LOW));
                 donated_slots = Math.ceil(msg.getNeedSlots() * surplus / (float)this.maxOwnedSlots);
-            } else if( surplus > (FREE_SLOTS_LOW/(float)don_nodes) ) {
+            } else if( surplus > Math.ceil((FREE_SLOTS_LOW/(float)don_nodes))) {
                 /* donate slots at least up to complete the minimal number of free slots */
                 donated_slots = Math.ceil((FREE_SLOTS_LOW/(float)don_nodes));
-            } else if( surplus > 0 ){ /* donate at least one */
+            } else if( surplus > 0 ) { /* donate at least one */
                 donated_slots = 1;
             } else {
                 donated_slots = 0;
             }
         }
+        
+        if (this.countActive(this.donorsNodes) == 0 && this.bmPendingNodes[requester] == false) {
+            /* next member always reply */
+            if(this.getNextMbr(requester) != this.nodeId) {
+                this.bmPendingNodes[requester] = true;
+                return;
+            }
+        }
 
-        /* Maximun number of slots that can be donated by message round - Limited by the message structure */
+        /* Maximum number of slots that can be donated by message round - Limited by the message structure */
         if(donated_slots > SLOTS_BY_MSG) {
             donated_slots = SLOTS_BY_MSG;
         }
@@ -376,8 +399,35 @@ public class ProgNormalNode extends Program {
 
 	/* If the slots are for other node, returns */
         if(msg.getRequester() != this.nodeId){
+            if(this.bmPendingNodes[this.nodeId] == true) {
+                int[] donatedSlotsList = new int[0];
+                SlotsMessageDonate donMsg = new SlotsMessageDonate(
+                msg.getSenderId(), donatedSlotsList.clone(), this.nodeId);
+                broadcast(donMsg);
+                this.bmPendingNodes[this.nodeId] = false;
+            }
             return;
         }
+        
+//	if( spin_ptr->mA_dst != local_nodeid) {
+//		rcode = OK;
+//		/* Are there any pending reply with ZERO slots for this destination ?*/
+//		if( TEST_BIT(bm_pending, spin_ptr->mA_dst)) {
+//			donated_slots = 0;
+//			requester = spin_ptr->mA_dst;
+//			TASKDEBUG("procs=%d donated_slots=%d requester=%d\n",
+//				(vm_ptr->vm_nr_tasks + vm_ptr->vm_nr_procs),donated_slots, requester);
+//			spout_ptr->m_source = local_nodeid;
+//			spout_ptr->m_type = SYS_DON_SLOTS;
+//			spout_ptr->mA_dst = requester;
+//			spout_ptr->mA_nr = donated_slots;
+//			for ( j = 0 ; j < SLOTS_BY_MSG; j++) spout_ptr->mA_ia[j] = 0;
+//			rcode = SP_multicast (sysmbox, SAFE_MESS, (char *) vm_ptr->vm_name,
+//				SYS_DON_SLOTS, sizeof(message), (char *) spout_ptr);
+//			CLR_BIT(bm_pending, spin_ptr->mA_dst);
+//		}
+//		return(rcode);
+//	}        
 
         this.donorsNodes[msg.getSenderId()] = false;
 	this.println("free_slots="+this.getFreeSlots()+" free_slots_low="
@@ -385,7 +435,8 @@ public class ProgNormalNode extends Program {
 	this.println("owned_slots="+this.getOwnedSlots()+" max_owned_slots="
                 +this.maxOwnedSlots+" bm_donors="+ Arrays.toString(donorsNodes)); 
         
-        if( this.state == STS_REQ_SLOTS && this.countActive(this.donorsNodes) == 0) {
+        if( this.state == STS_REQ_SLOTS && this.countActive(this.donorsNodes) == 0
+                && this.getOwnedSlots() == 0) {
             mbrRqstSlots(MIN_OWNED_SLOTS);
         }
         
@@ -434,6 +485,12 @@ public class ProgNormalNode extends Program {
     *---------------------------------------------------------------------*/    
     private void handleSlotsInitialized(SlotsMessageInitialized msg) {
         println("Handling Slots Initialize. Init Member: " + msg.getSenderId());
+        
+	/* Include initializing members until SYS_PUT_STATUS arrives */
+        if(this.state != STS_WAIT_INIT) {
+            this.initializedNodes[msg.getSenderId()] = true;
+            return;
+        }
         
         if(!(isInitialized(this.nodeId)) && (this.state != STS_WAIT_INIT)) {
             println("I am not initialized and not waiting initialization. Ignore...");
@@ -588,6 +645,28 @@ public class ProgNormalNode extends Program {
     
     public void println(String str) {
         System.out.println("Node[" + nodeId + "]: "+str);
+    }    
+    
+    public int getNextMbr(int node)  {
+        int i, next_mbr;
+
+        next_mbr = NO_PRIMARY_MBR;
+
+        if( this.countActive(this.initializedNodes) == 1) {
+            return(next_mbr);
+        }
+
+        i = node == SlotsDonation.MAX_NODES ? 1 : node + 1;
+        while(i < SlotsDonation.MAX_NODES) {
+            if (this.initializedNodes[i] == true) {    
+                next_mbr = i;
+                break;
+            }
+            i++;
+        }
+        println("bm_init: "+Arrays.toString(this.initializedNodes)+" Node: "+node
+        +" Next Mbr: "+ next_mbr);
+        return(next_mbr);
     }    
     
     /** find first owned busy slot and free it **/
@@ -802,6 +881,7 @@ public class ProgNormalNode extends Program {
             this.initializedNodes[i] = false;
             this.activeNodes[i] = false;
             this.donorsNodes[i] = false;
+            this.bmPendingNodes[i] = false;
         }          
     } 
     
@@ -839,8 +919,9 @@ public class ProgNormalNode extends Program {
             this.println("I'm below FREE_SLOTS_LOW");
             if( this.getOwnedSlots() < this.maxOwnedSlots ) { /* do I achieve the maximum threshold  ? */
                 if(this.countActive(this.donorsNodes) == 0) { 	/*  if there pending donation requests? */
-                    if( this.getOwnedSlots() < (this.maxOwnedSlots/this.getInitializedNodes()))
-                        leftover = (this.maxOwnedSlots/getInitializedNodes()) - getOwnedSlots();
+                    if( this.getOwnedSlots() < Math.ceil(this.maxOwnedSlots/this.getInitializedNodes()))
+//			leftover =  CEILING(max_owned_slots,init_nodes) - owned_slots;
+                        leftover = ((int)Math.ceil(this.maxOwnedSlots/getInitializedNodes())) - getOwnedSlots();
                     else
                         leftover = FREE_SLOTS_LOW - getFreeSlots();
                     this.println("leftover="+leftover+" free_slots="+
