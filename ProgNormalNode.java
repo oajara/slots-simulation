@@ -162,7 +162,7 @@ public class ProgNormalNode extends Program {
                         this.sysBarrier = true;
                     }
                     this.slotsTable[i].setOwner(this.primaryMember);
-                }
+                }   
             }
 	}
         
@@ -296,12 +296,19 @@ public class ProgNormalNode extends Program {
             }
         }
         
-        if (this.countActive(this.donorsNodes) == 0 && this.bmPendingNodes[requester] == false) {
+	/* if the local node does not have slots to donate and have no pending donation response to requester*/
+	/* it tries to reply later after receiving a donation message to the requester from other node		*/
+	/* WARNING: if any node has slots to donate, the requester will hang waiting for donations which 	*/
+	/* never will come. To break this issue, the requester's next member always 	replies  			*/
+
+        if (donated_slots == 0 && this.bmPendingNodes[requester] == false) {
             /* next member always reply */
             if(this.getNextMbr(requester) != this.nodeId) {
                 this.bmPendingNodes[requester] = true;
+                this.println("Delaying reply to "+requester);
                 return;
-            }
+            } 
+            this.println("I'm next member. Replying with zero slots to Node#"+ requester);
         }
 
         /* Maximum number of slots that can be donated by message round - Limited by the message structure */
@@ -399,12 +406,13 @@ public class ProgNormalNode extends Program {
 
 	/* If the slots are for other node, returns */
         if(msg.getRequester() != this.nodeId){
-            if(this.bmPendingNodes[this.nodeId] == true) {
+            if(this.bmPendingNodes[msg.getRequester()] == true) {
+                this.println("Delayed reply to Node#"+msg.getRequester());
                 int[] donatedSlotsList = new int[0];
                 SlotsMessageDonate donMsg = new SlotsMessageDonate(
-                msg.getSenderId(), donatedSlotsList.clone(), this.nodeId);
+                msg.getRequester(), donatedSlotsList.clone(), this.nodeId);
                 broadcast(donMsg);
-                this.bmPendingNodes[this.nodeId] = false;
+                this.bmPendingNodes[msg.getRequester()] = false;
             }
             return;
         }
@@ -459,7 +467,15 @@ public class ProgNormalNode extends Program {
         /*** TODO ***/
 
         this.slotsTable = this.cloneSlotTable(msg.getSlotsTable());
-        this.initializedNodes = cloneBitmapTable(msg.getInitializedNodes());
+        
+ 	/* bm_init considerer the bitmap sent by primary_mbr ORed by 					*/
+	/* the bitmap of those nodes initialized before SYS_PUT_STATUS message arrives 	*/        
+        boolean[] received = cloneBitmapTable(msg.getInitializedNodes());
+        for(int i = 1; i <= SlotsDonation.MAX_NODES; i++) {
+            if(received[i] == true) {
+                this.initializedNodes[i] = true;
+            }
+        }            
         this.println("Updated Initialized nodes table with: "+Arrays.toString(this.initializedNodes));
         
         this.state = STS_WAIT_INIT;
@@ -487,7 +503,7 @@ public class ProgNormalNode extends Program {
         println("Handling Slots Initialize. Init Member: " + msg.getSenderId());
         
 	/* Include initializing members until SYS_PUT_STATUS arrives */
-        if(this.state != STS_WAIT_INIT) {
+        if(this.state == STS_WAIT_INIT && msg.getSenderId() != this.nodeId) {
             this.initializedNodes[msg.getSenderId()] = true;
             return;
         }
@@ -647,27 +663,27 @@ public class ProgNormalNode extends Program {
         System.out.println("Node[" + nodeId + "]: "+str);
     }    
     
-    public int getNextMbr(int node)  {
-        int i, next_mbr;
-
-        next_mbr = NO_PRIMARY_MBR;
-
-        if( this.countActive(this.initializedNodes) == 1) {
-            return(next_mbr);
-        }
-
-        i = node == SlotsDonation.MAX_NODES ? 1 : node + 1;
-        while(i < SlotsDonation.MAX_NODES) {
-            if (this.initializedNodes[i] == true) {    
-                next_mbr = i;
-                break;
-            }
-            i++;
-        }
-        println("bm_init: "+Arrays.toString(this.initializedNodes)+" Node: "+node
-        +" Next Mbr: "+ next_mbr);
-        return(next_mbr);
-    }    
+//    public int getNextMbr(int node)  {
+//        int i, next_mbr;
+//
+//        next_mbr = NO_PRIMARY_MBR;
+//
+//        if( this.countActive(this.initializedNodes) == 1) {
+//            return(next_mbr);
+//        }
+//
+//        i = node == SlotsDonation.MAX_NODES ? 1 : node + 1;
+//        while(i < SlotsDonation.MAX_NODES) {
+//            if (this.initializedNodes[i] == true) {    
+//                next_mbr = i;
+//                break;
+//            }
+//            i++;
+//        }
+//        println("bm_init: "+Arrays.toString(this.initializedNodes)+" Node: "+node
+//        +" Next Mbr: "+ next_mbr);
+//        return(next_mbr);
+//    }    
     
     /** find first owned busy slot and free it **/
     private void markSlotFree() {
@@ -699,6 +715,26 @@ public class ProgNormalNode extends Program {
         }
         return NO_PRIMARY_MBR;
     }    
+    
+    int getNextMbr(int node) {
+        int i, next_mbr;
+
+//        TASKDEBUG("node=%d\n", node);
+
+        next_mbr = NO_PRIMARY_MBR;
+//        assert( node < drvs_ptr->d_nr_nodes);
+        if( this.getInitializedNodes() == 1) return(next_mbr);
+
+        for(i = 1, next_mbr = node; i < SlotsDonation.NODES; i++ ) {
+            next_mbr = (next_mbr + 1) % SlotsDonation.NODES;
+            if (this.isInitialized(next_mbr)) {
+                println("next="+next_mbr);
+                return(next_mbr);
+            }
+        }
+        return NO_PRIMARY_MBR;
+    }    
+   
  
     private boolean isInitialized(int nodeId) {
         return this.initializedNodes[nodeId];
