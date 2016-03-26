@@ -244,17 +244,17 @@ public class ProgNormalNode extends Program {
         
         println("Handling slot request from Node#"+requester);
 
+        /* the member is  not initialized yet, then it can't respond to this request */
+        if( !(this.isInitialized())) {
+            println("Cannot donate, I am not initialized");
+            return;
+        }
+        
         /* Ignore owns requests  */
         if(requester == this.nodeId) {
             println("Won't donate to myself. Ignoring...");
             return;
-        }
-        
-        /* the member is  not initialized yet, then it can't respond to this request */
-        if( !(isInitialized())) {
-            println("Cannot donate, I am not initialized");
-            return;
-        }
+        }        
 
         /* Verify if the requester is initialized */
         if( !(isInitialized(requester))) {
@@ -343,6 +343,12 @@ public class ProgNormalNode extends Program {
         broadcast(donMsg);        
     }
     
+    /*----------------------------------------------------------------------------------------------------
+    *				sp_don_slots
+    *   SYS_DON_SLOTS: A Donation Message has received
+    *  If it is the destination systask, it adds the new free slots to its own
+    * or if they are for other node register the new ownership
+    *----------------------------------------------------------------------------------------------------*/    
     private void handleSlotsDonation(SlotsMessageDonate msg) {
         this.println("Handling Slots Donate from Node#"+msg.getSenderId());
         
@@ -503,7 +509,7 @@ public class ProgNormalNode extends Program {
         println("Handling Slots Initialize. Init Member: " + msg.getSenderId());
         
 	/* Include initializing members until SYS_PUT_STATUS arrives */
-        if(this.state == STS_WAIT_INIT && msg.getSenderId() != this.nodeId) {
+        if(this.state == STS_WAIT_STATUS) {
             this.initializedNodes[msg.getSenderId()] = true;
             return;
         }
@@ -513,11 +519,14 @@ public class ProgNormalNode extends Program {
             return;
         }
         
+        /* Is the new initialized member allready considered as Initilized ? */
         if(!isInitialized(msg.getSenderId())) {
             println("Marking Node#"+msg.getSenderId()+" as initialized in my table.");
             this.initializedNodes[msg.getSenderId()] = true;
         } else {
+            /* Here comes initialized members without owned slots after a NETWORK MERGE */
             println("WARNING member "+msg.getSenderId()+" just was initilized");
+            return;
         }
         
         /* compute the slot high water threshold	*/
@@ -741,7 +750,7 @@ public class ProgNormalNode extends Program {
     }
     
     public boolean isInitialized() {
-        return this.isInitialized(nodeId);
+        return this.isInitialized(this.nodeId);
     }        
     
     private String getStateAsString() {
