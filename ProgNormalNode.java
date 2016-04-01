@@ -29,6 +29,7 @@ public class ProgNormalNode extends Program {
     private boolean[] initializedNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] donorsNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] bmPendingNodes = new boolean[SlotsDonation.MAX_NODES+1];
+    private boolean[] bmWaitSts = new boolean[SlotsDonation.MAX_NODES+1];
     private final int nodeId;
     private int state = STS_DISCONNECTED;
     private int primaryMember;
@@ -176,6 +177,14 @@ public class ProgNormalNode extends Program {
 	}
     } 
     
+    private boolean amIsender(SpreadMessage msg) {
+        return msg.getSenderId() == this.nodeId;
+    }
+
+    /*===========================================================================*
+     *				sp_join											 *
+     * A NEW member has joint the VM group but it is not initialized
+     *===========================================================================*/    
     private void handleSpreadJoin(SpreadMessageJoin msg) {
         this.println("Handling Spread Join");
         
@@ -186,7 +195,7 @@ public class ProgNormalNode extends Program {
             return;
         }
                 
-        if( msg.getSenderId() == this.nodeId){ /* The own JOIN message	*/
+        if( this.amIsender(msg)){ /* The own JOIN message	*/
             this.println("Received my own Join message");
 
             if (this.getActiveNodes() == 1) { 		/* It is a LONELY member*/
@@ -218,7 +227,7 @@ public class ProgNormalNode extends Program {
             println("Other member joines the group: node#"+msg.getSenderId()+". My State="+this.getStateAsString());
 
             /* I am not initialized yet */
-            if( (!this.isInitialized()) && (this.state != STS_WAIT_INIT)) {
+            if( (!this.isInitialized())) {
                 println("I'm not Inizialized nor waiting init. My State:" +this.getStateAsString());
                 return;
             }
@@ -226,12 +235,97 @@ public class ProgNormalNode extends Program {
             /* if the new member was previously considered as a member of other    */
             /* partition but really had crashed, allocate its slots to primary_mbr */
             /* TODO!!! */
+            
+            /* This node has sent an SYS_REQ_SLOTS messages, but before the other nodes 	*/
+            /* (and itself) could receive slots donation, a VIEW CHANGE (JOIN) has  occurred 	*/
+            /* This means that the SYS_REQ_SLOTS message is not STABLE and it was discarded 	*/
+            /* Therefore, if the local node hasn't got any owned slot, it must request again 		*/
+	    println("bm_donors="+Arrays.toString(this.donorsNodes)+
+                    " bm_pending="+Arrays.toString(this.bmPendingNodes));
+            this.cleanBinaryList(this.donorsNodes);
+            this.cleanBinaryList(this.bmPendingNodes);
+            
+            /* Sets the bm_waitsts bitmap to signal which new member need to get STATUS from PRIMARY  */
+            
+            println("member="+this.nodeId+" state="+STS_RUNNING);
+            if (this.state == STS_RUNNING ) { 	
+                this.bmWaitSts[msg.getSenderId()] = true;
 
-            if (primaryMember == nodeId && this.state == STS_RUNNING ) { 	
                 this.sendStatusInfo(msg.getSenderId());
-            }
+            }            
+
 	}
     }
+
+    /*======================================================================*
+     *				sp_put_status				*
+     * A new member has joined the group. 					*
+     * The Primary has broadcasted Global Status information		*
+     *======================================================================*/    
+    private void handleSlotsPutStatus(SlotsMessagePutStatus msg) {
+        this.println("Handling Slots Put Status from Node#"+msg.getSenderId()+" to Node#"+msg.getDestination());
+        
+        int initMbr = msg.getDestination();
+        
+        if(initMbr == this.nodeId) {
+            if(this.state == STS_RUNNING) {
+                this.bmWaitSts[initMbr] = false;
+                println("init_mbr="+initMbr+" bm_waitsts="+Arrays.toString(this.bmWaitSts));
+                if(this.getOwnedSlots() == 0 &&
+                        this.countActive(this.donorsNodes) == 0) {
+                    this.state = STS_REQ_SLOTS;
+                    this.mbrRqstSlots(MIN_OWNED_SLOTS);
+                }
+            } else {
+                return;
+            }
+        
+            /* Is the new initialized member already considered as Initialized ? */
+            if(!this.isInitialized(initMbr)){ 	/* No, set the bitmap and count */
+                this.initializedNodes[initMbr] = true;
+            } else {
+                /* Here comes initialized members without owned slots after a NETWORK MERGE */
+                println("WARNING member "+initMbr+" just was initilized");
+                return;
+            }        
+        
+            println("init_mbr="+initMbr+" bm_init="+Arrays.toString(this.initializedNodes));
+
+            /* compute the slot high water threshold	*/
+            this.maxOwnedSlots = (SlotsDonation.TOTAL_SLOTS - 
+                    (MIN_OWNED_SLOTS * (this.getInitializedNodes() - 1)));        
+            println("bm_init="+Arrays.toString(this.initializedNodes)+
+                    " max_owned_slots="+this.maxOwnedSlots);
+            
+            return;
+        }
+        
+	/*
+	*   For LOCAL NODE
+	*/
+        assert(this.state == STS_WAIT_STATUS);
+        
+        
+ 	/* bm_init considerer the bitmap sent by primary_mbr ORed by 					*/
+	/* the bitmap of those nodes initialized before SYS_PUT_STATUS message arrives 	*/        
+        boolean[] received = cloneBitmapTable(msg.getInitializedNodes());
+        for(int i = 1; i <= SlotsDonation.MAX_NODES; i++) {
+            if(received[i] == true) {
+                this.initializedNodes[i] = true;
+            }
+        }            
+        this.println("Updated Initialized nodes table with: "+Arrays.toString(this.initializedNodes));
+        
+       
+        /* Copy the received slot table to local table	*/
+        this.slotsTable = this.cloneSlotTable(msg.getSlotsTable());
+        
+	/* The member is initialized but it hasn't got slots to start running */
+        this.state = STS_REQ_SLOTS;
+	this.println("Requesting slots");
+        this.mbrRqstSlots(MIN_OWNED_SLOTS);
+    }
+
     
     /*---------------------------------------------------------------------
     *			sp_req_slots
@@ -342,7 +436,7 @@ public class ProgNormalNode extends Program {
         this.counterDonatedSlots = donatedSlotsList.length + this.counterDonatedSlots;
         broadcast(donMsg);        
     }
-    
+        
     /*----------------------------------------------------------------------------------------------------
     *				sp_don_slots
     *   SYS_DON_SLOTS: A Donation Message has received
@@ -388,7 +482,7 @@ public class ProgNormalNode extends Program {
             if( this.getOwnedSlots() == 0){ /* a new member without slots */
                     this.println("Wake up fork/exit");
                     this.sysBarrier = true;	/* Wakeup SYSTASK 		*/	
-            }            
+            }
 	}	
         
 	/* Change the owner of the donated slots */
@@ -461,94 +555,10 @@ public class ProgNormalNode extends Program {
 
     }
     
-    private void handleSlotsPutStatus(SlotsMessagePutStatus msg) {
-        this.println("Handling Slots Put Status from Node#"+msg.getSenderId()+" to Node#"+msg.getDestination());
-        
-        if( this.state != STS_WAIT_STATUS) {
-            this.println("I am not waiting status info. Ignore...");
-            return;
-        }
-        
-        /* Compare own VM descriptor against received VM descriptor */
-        /*** TODO ***/
-
-        this.slotsTable = this.cloneSlotTable(msg.getSlotsTable());
-        
- 	/* bm_init considerer the bitmap sent by primary_mbr ORed by 					*/
-	/* the bitmap of those nodes initialized before SYS_PUT_STATUS message arrives 	*/        
-        boolean[] received = cloneBitmapTable(msg.getInitializedNodes());
-        for(int i = 1; i <= SlotsDonation.MAX_NODES; i++) {
-            if(received[i] == true) {
-                this.initializedNodes[i] = true;
-            }
-        }            
-        this.println("Updated Initialized nodes table with: "+Arrays.toString(this.initializedNodes));
-        
-        this.state = STS_WAIT_INIT;
-        
-	/* Report to other nodes as INITILIZED */
-	this.println("Multicasting SYS_INITIALIZED");
-	broadcast(new SlotsMessageInitialized(this.nodeId));        
- 
-    }
-    
-    private void handleSlotsNewStatus(SlotsMessageNewStatus msg) {
-        this.println("Handling Slots New Status (TODO)");
-    }    
     
     private void handleSlotsMergeStatus(SlotsMessageMergeStatus msg) {
         this.println("Handling Slots Merge Status (TODO)");
     }        
-    
-    /*--------------------------------------------------------------------
-    *				handleSlotsInitialized
-    *   SYS_INITIALIZED: A initialized member message has been received
-    *  All members update their states
-    *---------------------------------------------------------------------*/    
-    private void handleSlotsInitialized(SlotsMessageInitialized msg) {
-        println("Handling Slots Initialize. Init Member: " + msg.getSenderId());
-        
-	/* Include initializing members until SYS_PUT_STATUS arrives */
-        if(this.state == STS_WAIT_STATUS) {
-            this.initializedNodes[msg.getSenderId()] = true;
-            return;
-        }
-        
-        if(!(isInitialized(this.nodeId)) && (this.state != STS_WAIT_INIT)) {
-            println("I am not initialized and not waiting initialization. Ignore...");
-            return;
-        }
-        
-        /* Is the new initialized member allready considered as Initilized ? */
-        if(!isInitialized(msg.getSenderId())) {
-            println("Marking Node#"+msg.getSenderId()+" as initialized in my table.");
-            this.initializedNodes[msg.getSenderId()] = true;
-        } else {
-            /* Here comes initialized members without owned slots after a NETWORK MERGE */
-            println("WARNING member "+msg.getSenderId()+" just was initilized");
-            return;
-        }
-        
-        /* compute the slot high water threshold	*/
-	this.maxOwnedSlots = (SlotsDonation.TOTAL_SLOTS - 
-                (MIN_OWNED_SLOTS * (this.getInitializedNodes() - 1)));
-        
-        if(msg.getSenderId() == this.nodeId) {
-            if(this.state == STS_WAIT_INIT) {
-                println("I was waiting my own initialize msg");	
-            }
-            /* The member is initialized but it hasn't got slots to start running */
-            this.state = STS_REQ_SLOTS;
-            mbrRqstSlots(MIN_OWNED_SLOTS);
-        } else {
-            println("This was a initialization message of someone else. Ignore...");
-            /* get remote SYSTASK  process descriptor pointer */
-            /* is remote SYSTASK bound to the correct node ?*/
-            /* Is the remote SYSTASK bound ? */
-        }
-        
-        
-    } 
     
     private void sendStatusInfo(int destId) {
 	/* Build Global Status Information (VM + bm_init + Shared slot table */
@@ -630,12 +640,6 @@ public class ProgNormalNode extends Program {
                             }
 			}
                         this.handleSlotsPutStatus((SlotsMessagePutStatus)msg);
-                    }  else if (msg instanceof SlotsMessageInitialized) {
-                        this.handleSlotsInitialized((SlotsMessageInitialized)msg);
-                    } else if (msg instanceof SlotsMessageNewStatus) {
-                        mbr = ((SlotsMessageNewStatus)msg).getSenderId();
-                        this.primaryMember = mbr;
-                        this.handleSlotsNewStatus((SlotsMessageNewStatus)msg);
                     } else if (msg instanceof SlotsMessageMergeStatus) {
                         this.handleSlotsMergeStatus((SlotsMessageMergeStatus)msg);
                     } else {
@@ -919,6 +923,14 @@ public class ProgNormalNode extends Program {
         this.sysBarrier = false;
         this.pendingConnect = false;
         this.maxOwnedSlots = 0;
+        
+        this.cleanBinaryList(this.bmWaitSts);
+    }
+    
+    private void cleanBinaryList(boolean[] list) {
+        for(int i = 1; i <= list.length; i++) {
+            list[i] = false;
+        }
     }
     
     private void cleanNodesLists() {
