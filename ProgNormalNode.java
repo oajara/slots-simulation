@@ -25,6 +25,7 @@ public class ProgNormalNode extends Program {
     
     private final Random random;
     private Slot[] slotsTable = new Slot[SlotsDonation.TOTAL_SLOTS];
+    private Process[] processTable = new Process[SlotsDonation.TOTAL_SLOTS];
     private boolean[] activeNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] initializedNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] donorsNodes = new boolean[SlotsDonation.MAX_NODES+1];
@@ -56,7 +57,13 @@ public class ProgNormalNode extends Program {
         this.nodeId = id;
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
             slotsTable[i] = new Slot(0, Slot.STATUS_FREE);
-        }  
+        } 
+        
+        // init process table as empty
+        for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
+            this.processTable[i] = null;
+        }        
+        
         this.cleanNodesLists();
 }
     
@@ -676,27 +683,19 @@ public class ProgNormalNode extends Program {
         System.out.println("Node[" + nodeId + "]: "+str);
     }    
     
-//    public int getNextMbr(int node)  {
-//        int i, next_mbr;
-//
-//        next_mbr = NO_PRIMARY_MBR;
-//
-//        if( this.countActive(this.initializedNodes) == 1) {
-//            return(next_mbr);
-//        }
-//
-//        i = node == SlotsDonation.MAX_NODES ? 1 : node + 1;
-//        while(i < SlotsDonation.MAX_NODES) {
-//            if (this.initializedNodes[i] == true) {    
-//                next_mbr = i;
-//                break;
-//            }
-//            i++;
-//        }
-//        println("bm_init: "+Arrays.toString(this.initializedNodes)+" Node: "+node
-//        +" Next Mbr: "+ next_mbr);
-//        return(next_mbr);
-//    }    
+
+    public int decProcessesLifetimes() {
+        int counter = 0;
+        for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
+            processTable[i].time_left--;
+            if(processTable[i].time_left == 0) {
+                processTable[i] = null;
+                this.doExit();
+                counter++;
+            }
+        }  
+        return counter;
+    }
     
     /** find first owned busy slot and free it **/
     private void markSlotFree() {
@@ -832,13 +831,6 @@ public class ProgNormalNode extends Program {
         } else {
             action = -1;
         }
-//        else if (number >= 900 && number < 999) {
-//            action = 2;
-//        } else if (number >= 999 && number < 1000) {
-//            action = 3;
-//        } else {
-//            action = 4;
-//        }
 
         switch(action) {
             case 0:
@@ -928,7 +920,7 @@ public class ProgNormalNode extends Program {
     }
     
     private void cleanBinaryList(boolean[] list) {
-        for(int i = 1; i <= list.length; i++) {
+        for(int i = 1; i < list.length; i++) {
             list[i] = false;
         }
     }
