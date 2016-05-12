@@ -277,7 +277,7 @@ public class ProgNormalNode extends Program {
                 this.bmWaitSts[msg.getSenderId()] = true;
 
                 if(this.primaryMember == this.nodeId) {
-                    this.initializedNodes[msg.getSenderId()] = true;
+// PAP (-)          this.initializedNodes[msg.getSenderId()] = true;
                     this.sendStatusInfo(msg.getSenderId());
                 }
                     
@@ -297,6 +297,7 @@ public class ProgNormalNode extends Program {
         int initMbr = msg.getDestination();
         
         if(initMbr != this.nodeId) {
+// PAP (+)  this.bmWaitSts[initMbr] = false;
             if(this.state == STS_RUNNING) {
                 this.println("ANULADO!: "+Arrays.toString(this.initializedNodes));
 //                this.bmWaitSts[initMbr] = false;
@@ -306,6 +307,11 @@ public class ProgNormalNode extends Program {
 //                    this.state = STS_REQ_SLOTS;
 //                    this.mbrRqstSlots(MIN_OWNED_SLOTS);
 //                }
+// PAP (+)  }else if (TEST_BIT(FSM_state, BIT_REQUESTING)) {
+// PAP (+) 	TASKDEBUG("init_mbr=%d bm_waitsts=%d \n",init_mbr, bm_waitsts);			
+// PAP (+) 	if( bm_waitsts == 0)
+// PAP (+) 		if( init_nodes > 1)
+// PAP (+) 			rcode = mbr_rqst_slots(min_owned_slots);
             } else {
                 return;
             }
@@ -327,9 +333,16 @@ public class ProgNormalNode extends Program {
             println("bm_init="+Arrays.toString(this.initializedNodes)+
                     " max_owned_slots="+this.maxOwnedSlots);
             
-            return;
+// PAP (+) /* IMPLICIT SYS_REQ_SLOTS when JOIN->PUT_STATUS  */
+// PAP (+)  rcode = sp_req_slots(init_mbr, min_owned_slots);
+// PAP (+)  if(rcode != OK) PRINT ERROR ;
+// PAP (-)  return;
         }
-        
+
+// PAP(+)/*
+// PAP(+)*   INIT_MBR is  LOCAL NODE
+// PAP(+)*The init_mbr has receipt a SYS_PUT_STATUS message, therefore does not need anymore 
+// PAP(+)*/        
         
  	/* bm_init considerer the bitmap sent by primary_mbr ORed by 					*/
 	/* the bitmap of those nodes initialized before SYS_PUT_STATUS message arrives 	*/        
@@ -352,7 +365,8 @@ public class ProgNormalNode extends Program {
 	/* The member is initialized but it hasn't got slots to start running */
         this.state = STS_REQ_SLOTS;
 	this.println("Requesting slots");
-        this.mbrRqstSlots(MIN_OWNED_SLOTS);
+//PAP(+)/* IMPLICIT SYS_REQ_SLOTS when JOIN->PUT_STATUS  */
+//PAP(-)  this.mbrRqstSlots(MIN_OWNED_SLOTS);
     }
 
     
@@ -391,7 +405,7 @@ public class ProgNormalNode extends Program {
         * ALL other initialized members respond to a request slot message 
         * but only members with enough slots will donate
         */
-        if( this.state != STS_RUNNING) {
+        if( this.state != STS_RUNNING) { /* PAP: ES EQUIVALENTE A TEST_BIT( FSM_state, BIT_REQUESTING)??*/
             donated_slots = 0;
         } else {
             if (this.countActive(this.donorsNodes) > 0) {
@@ -407,8 +421,8 @@ public class ProgNormalNode extends Program {
             println("free_slots="+ this.getFreeSlots()+" free_slots_low="+FREE_SLOTS_LOW
                     +" needed_slots="+msg.getNeedSlots()+" don_nodes="+don_nodes
                     +" surplus="+surplus);
-            if( surplus > msg.getNeedSlots()) {  /* donate the slots requested  */
-                donated_slots = Math.ceil(msg.getNeedSlots() * surplus / (float)this.maxOwnedSlots);
+//PAP(*)    if( surplus > Math.ceil(msg.getNeedSlots()/(float)don_nodes)) {  /* donate the slots requested  */
+//PAP(*)        donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
             } else if( surplus > Math.ceil((FREE_SLOTS_LOW/(float)don_nodes))) {
                 /* donate slots at least up to complete the minimal number of free slots */
                 donated_slots = Math.ceil((FREE_SLOTS_LOW/(float)don_nodes));
@@ -486,20 +500,20 @@ public class ProgNormalNode extends Program {
 
 	/* Is the destination an initialized member ? */
         if(!this.isInitialized(msg.getRequester())) {
-//            println("WARNING Destination member node#"+msg.getRequester()
-//                    +" is not initialized");
-//            return;
-            println("HOTFIX: marking node#"+msg.getRequester()+" as initialized");
-            this.initializedNodes[msg.getRequester()] = true;
+//PAP(+)            println("WARNING Destination member node#"+msg.getRequester()
+//PAP(+)                    +" is not initialized");
+//PAP(+)            return;
+//PAP(-)            println("HOTFIX: marking node#"+msg.getRequester()+" as initialized");
+//PAP(-)            this.initializedNodes[msg.getRequester()] = true;
 	}
 
 	/* Is the donor an initialized member ? */
         if(!this.isInitialized(msg.getSenderId())) {
-//            println("WARNING Source member node#"+msg.getSenderId()+
-//                    " is not initialized");
-//            return;
-            println("HOTFIX: marking node#"+msg.getSenderId()+" as initialized");
-            this.initializedNodes[msg.getSenderId()] = true;            
+//PAP(+)           println("WARNING Source member node#"+msg.getSenderId()+
+//PAP(+)                   " is not initialized");
+//PAP(+)            return;
+//PAP(-)            println("HOTFIX: marking node#"+msg.getSenderId()+" as initialized");
+//PAP(-)            this.initializedNodes[msg.getSenderId()] = true;            
 	}        
 
         int[] donatedList = msg.getDonatedIdList().clone();
