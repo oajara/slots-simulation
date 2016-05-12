@@ -2,10 +2,11 @@ import daj.Message;
 import daj.Program;
 import daj.Node;
 import java.util.Arrays;
+import java.util.Random;
 
-/**
- * Program for each node.
- */
+/*
+TODO: generalizar vector shuffle: max 64, pasar actual length como param 
+*/
 
 public class ProgSpreadNode extends Program {
     int broadcasted = 0;
@@ -124,10 +125,13 @@ public class ProgSpreadNode extends Program {
     private void sendToAll(Message msg) {
         /* send to  all active nodes, including requester */
         //println("Sending message to all active nodes...");
-        for(int i=1; i<SlotsDonation.NODES+1; i++){
-            if(this.isActive(i)) {
+        int[] vector = {1,2,3};
+        int[] shuff = Testing.RandomizeArray(vector);
+        
+        for(int i=0; i<SlotsDonation.NODES; i++){
+            if(this.isActive(shuff[i])) {
                 //this.println("... to node#"+i);
-                out(i-1).send(msg); // because link to node n is locate at out(n-1)
+                out(shuff[i]-1).send(msg); // because link to node n is locate at out(n-1)
             }
         } 
         broadcasted++;        
@@ -185,5 +189,18 @@ public class ProgSpreadNode extends Program {
         }
         return "Active Nodes: " + count+ "\nMessages: "+msgs;
     }
+    
+    public int[] randomizeArray(int[] array){
+            Random rgen = new Random();  // Random number generator			
+
+            for (int i=0; i<array.length; i++) {
+                int randomPosition = rgen.nextInt(array.length);
+                int temp = array[i];
+                array[i] = array[randomPosition];
+                array[randomPosition] = temp;
+            }
+
+            return array;
+    }    
     
 }

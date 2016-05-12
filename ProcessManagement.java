@@ -21,9 +21,9 @@ public class ProcessManagement {
             if(owner.isInitialized()) {
                 action = random.nextInt(2);
                 if (action == 0) {
-                    owner.doFork();
+                    owner.tryFork();
                 } else if (owner.getUsedSlots() > 0) {
-                    owner.doExit();
+//                    owner.doExit();
                 }
             } else {
                 println("Node not initialized, won't mess with processes");

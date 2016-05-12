@@ -5,11 +5,11 @@ import java.io.*;
 
 public class SlotsDonation extends Application {
     
-    public static final int WINW = 1500;
-    public static final int WINH = 900;
-    public static final int NODES = 8;
-    public static final int MAX_NODES = 8;
-    public static final int TOTAL_SLOTS = 512;
+    public static final int WINW = 600;
+    public static final int WINH = 300;
+    public static final int NODES = 3;
+    public static final int MAX_NODES = 3;
+    public static final int TOTAL_SLOTS = 64;
     
     private Node[] nodes;
 

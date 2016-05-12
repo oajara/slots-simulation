@@ -9,6 +9,7 @@ package daj;
 
 import daj.awt.NodeVisual;
 import daj.awt.Visualizer;
+import ProgNormalNode;
 
 abstract public class Scheduler {
 
@@ -238,6 +239,13 @@ abstract public class Scheduler {
 	public void schedule() {
 		schedule(nextProgram());
 	}
+        
+//        public void decProcessesLifetimes() {
+//            for(int i=1; i<this.nodeNum; i++) {
+//                ProgNormalNode p = (ProgNormalNode)(this.node[i].getProgram());
+//                p.decProcessesLifetimes();
+//            }
+//        }
 
 	// --------------------------------------------------------------------------
 	// increase network time
