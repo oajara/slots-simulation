@@ -21,18 +21,18 @@ public class ProgNormalNode extends Program {
     
     public static final int MAX_NEW_PROCS = 1;
     
-    private static final int MEDIAN_CHANGE_INTERVAL = 20000;
+    private static final int MEDIAN_CHANGE_INTERVAL = 5000;
     
-    private static final int LT_UNIT = 10;
+    private static final int LT_UNIT = 15;
     private static final int LT_MIN = 1;
-    private static final int LT_MAX = 10;    
+    private static final int LT_MAX = 50;    
     
-    private static final int FI_MAX = 100;
+    private static final int FI_MAX=  20;
     private static final int FI_MIN = 1;
     private static final int FI_RANGE = (FI_MAX-FI_MIN+1)/2;
     
-    private static final int FI_MIN_AVG = LT_UNIT;
-    private static final int FI_MAX_AVG = FI_MAX - LT_UNIT;
+    private static final int FI_MIN_AVG = 5;
+    private static final int FI_MAX_AVG = 20;
     
    
 //    public static final int MIN_OWNED_SLOTS = 4;
@@ -276,13 +276,13 @@ public class ProgNormalNode extends Program {
             println("member="+this.nodeId+" state="+STS_RUNNING);
             if (this.state == STS_RUNNING ) { 	
                 if(this.primaryMember == this.nodeId) {
-					if (this.getWaitStsNodes() == 0) { 
-						this.sendStatusInfo(msg.getSenderId());
-					}
+                    if (this.getWaitStsNodes() == 0) { 
+                            this.sendStatusInfo(msg.getSenderId());
+                    }
                 }
                 this.bmWaitSts[msg.getSenderId()] = true;                    
             }            
-		}
+	}
     }
 
     /*======================================================================*
@@ -300,24 +300,23 @@ public class ProgNormalNode extends Program {
             println("init_mbr="+initMbr+" bm_waitsts="+Arrays.toString(this.bmWaitSts));
             if(this.state == STS_RUNNING) {
                 if(this.primaryMember == this.nodeId) {
-					if (this.getWaitStsNodes() != 0) { 
-					    next_wait = getNextWait(0);
-						this.sendStatusInfo(next_wait);
-					}
-				}
-			} else if (this.getOwnedSlots() == 0 &&
-                        this.countActive(this.donorsNodes) == 0) {
-				if (this.getWaitStsNodes() == 0) { 		
+                    if (this.getWaitStsNodes() != 0) { 
+                        int next_wait = getNextWait(0);
+                        this.sendStatusInfo(next_wait);
+                    }
+                }
+            } else if (this.getOwnedSlots() == 0 && this.countActive(this.donorsNodes) == 0) {
+                if (this.getWaitStsNodes() == 0) { 		
                     this.state = STS_REQ_SLOTS;
-					if(this.getInitializedNodes > 1 )
-						this.mbrRqstSlots(MIN_OWNED_SLOTS);
-				}
-            } else
+                    if(this.getInitializedNodes() > 1 )
+                        this.mbrRqstSlots(MIN_OWNED_SLOTS);
+                }
+            } else {
                 return;
             }
         
             /* Is the new initialized member already considered as Initialized ? */
-            if(!this.isInitialized(initMbr)){ 	/* No, set the bitmap and count */
+            if(!this.isInitialized(initMbr)) { 	/* No, set the bitmap and count */
                 this.initializedNodes[initMbr] = true;
             } else {
                 /* Here comes initialized members without owned slots after a NETWORK MERGE */
@@ -333,18 +332,20 @@ public class ProgNormalNode extends Program {
             println("bm_init="+Arrays.toString(this.initializedNodes)+
                     " max_owned_slots="+this.maxOwnedSlots);
             
-			/* IMPLICIT SYS_REQ_SLOTS when JOIN->PUT_STATUS  */
-			// PAP: CONSTRUIR UN MENSAJE con parametro initMbr como source 
-			// y MIN_OWNED_SLOTS como getNeedSlots
-			// para poder invocar a la funcion.
-			this.handleSlotsRequest(XXXXXXXXX msg );
-			return;
+            /* IMPLICIT SYS_REQ_SLOTS when JOIN->PUT_STATUS  */
+            // PAP: CONSTRUIR UN MENSAJE con parametro initMbr como source 
+            // y MIN_OWNED_SLOTS como getNeedSlots
+            // para poder invocar a la funcion.
+            SlotsMessageRequest newMsg = new SlotsMessageRequest(MIN_OWNED_SLOTS,
+                this.getFreeSlots(), this.getOwnedSlots(), initMbr);
+            this.handleSlotsRequest(newMsg);
+            return;
         }
 
-		/*
-		*   INIT_MBR is  LOCAL NODE
-		*The init_mbr has receipt a SYS_PUT_STATUS message, therefore does not need anymore 
-		*/        
+        /*
+        *   INIT_MBR is  LOCAL NODE
+        *The init_mbr has receipt a SYS_PUT_STATUS message, therefore does not need anymore 
+        */        
         
  	/* bm_init considerer the bitmap sent by primary_mbr ORed by 					*/
 	/* the bitmap of those nodes initialized before SYS_PUT_STATUS message arrives 	*/        
@@ -771,7 +772,7 @@ public class ProgNormalNode extends Program {
 
         for(i = 1, wait_mbr = node; i < SlotsDonation.NODES; i++ ) {
             wait_mbr = (wait_mbr + 1) % SlotsDonation.NODES;
-            if (this.bmWaitSts(wait_mbr)) {
+            if (this.bmWaitSts[wait_mbr]) {
                 println("next="+wait_mbr);
                 return(wait_mbr);
             }
@@ -884,6 +885,7 @@ public class ProgNormalNode extends Program {
         
         if (this.timeLeftToFork == 0) { // time for a new fork
             this.timeLeftToFork = this.getNextForkTime();
+            println("Next process in: "+this.timeLeftToFork);
             if(this.isConnected() && this.isInitialized() && this.sysBarrier) {
                 this.tryFork();
             }
@@ -1086,9 +1088,10 @@ public class ProgNormalNode extends Program {
         //int lt = MIN_PLIFETIME + this.random.nextInt(MAX_PLIFETIME - MIN_PLIFETIME + 1);
         
         double val = this.random.nextFloat();
+        
                 
         for (int i = 1 + LT_MIN ; i<LT_MAX; i++) {
-            if(val < 1-(1/i)) {
+            if(val < 1-(1/(double)i)) {
                 return (i - 1) * LT_UNIT;
             }
         }
