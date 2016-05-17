@@ -29,7 +29,7 @@ public class ProgNormalNode extends Program {
     
     private static final int FI_MAX=  20;
     private static final int FI_MIN = 1;
-    private static final int FI_RANGE = (FI_MAX-FI_MIN+1)/2;
+    private static final int FI_RANGE = 4;
     
     private static final int FI_MIN_AVG = 5;
     private static final int FI_MAX_AVG = 20;
@@ -1006,7 +1006,7 @@ public class ProgNormalNode extends Program {
         //this.println("Executing a fork");
         
 	if( this.getFreeSlots() < FREE_SLOTS_LOW ) {
-            this.println("I'm below FREE_SLOTS_LOW");
+            this.println("I'm below FREE_SLOTS_LOW. Free Slost: "+this.getFreeSlots());
             if( this.getOwnedSlots() < this.maxOwnedSlots ) { /* do I achieve the maximum threshold  ? */
                 if(this.countActive(this.donorsNodes) == 0) { 	/*  if there pending donation requests? */
                     if( this.getOwnedSlots() < Math.ceil(this.maxOwnedSlots/this.getInitializedNodes()))
