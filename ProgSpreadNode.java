@@ -125,7 +125,7 @@ public class ProgSpreadNode extends Program {
     private void sendToAll(Message msg) {
         /* send to  all active nodes, including requester */
         //println("Sending message to all active nodes...");
-        int[] vector = {1,2,3};
+        int[] vector = {1,2,3,4,5};
         int[] shuff = Testing.RandomizeArray(vector);
         
         for(int i=0; i<SlotsDonation.NODES; i++){
