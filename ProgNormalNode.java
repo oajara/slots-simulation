@@ -16,14 +16,14 @@ public class ProgNormalNode extends Program {
     public static final int NO_PRIMARY_MBR = -1;
     
     public static final int MIN_OWNED_SLOTS = 8;
-    public static final int FREE_SLOTS_LOW = 8;
+    public static final int FREE_SLOTS_LOW = 4;
     public static final int SLOTS_BY_MSG = 1024;
     
     public static final int MAX_NEW_PROCS = 1;
     
     private static final int MEDIAN_CHANGE_INTERVAL = 5000;
     
-    private static final int LT_UNIT = 15;
+    private static final int LT_UNIT = 27;
     private static final int LT_MIN = 1;
     private static final int LT_MAX = 50;    
     
@@ -52,7 +52,7 @@ public class ProgNormalNode extends Program {
     private final int nodeId;
     private int state = STS_DISCONNECTED;
     private int primaryMember;
-    private int maxOwnedSlots = SLOTS_BY_MSG;
+    private int maxOwnedSlots = SlotsDonation.TOTAL_SLOTS;
     private boolean sysBarrier = false;
     private boolean pendingConnect = false;
     
@@ -302,7 +302,9 @@ public class ProgNormalNode extends Program {
                 if(this.primaryMember == this.nodeId) {
                     if (this.getWaitStsNodes() != 0) { 
                         int next_wait = getNextWait(0);
-                        this.sendStatusInfo(next_wait);
+                        if (next_wait != NO_PRIMARY_MBR) {
+                            this.sendStatusInfo(next_wait);
+                        }
                     }
                 }
             } else if (this.getOwnedSlots() == 0 && this.countActive(this.donorsNodes) == 0) {
@@ -420,9 +422,9 @@ public class ProgNormalNode extends Program {
             assert( don_nodes > 0);
 
             surplus = (this.getFreeSlots() - FREE_SLOTS_LOW);
-            println("free_slots="+ this.getFreeSlots()+" free_slots_low="+FREE_SLOTS_LOW
-                    +" needed_slots="+msg.getNeedSlots()+" don_nodes="+don_nodes
-                    +" surplus="+surplus);
+            println("free_slots:"+ this.getFreeSlots()+" free_slots_low:"+FREE_SLOTS_LOW
+                    +" needed_slots:"+msg.getNeedSlots()+" don_nodes:"+don_nodes
+                    +" surplus:"+surplus);
 			if( surplus > Math.ceil(msg.getNeedSlots()/(float)don_nodes)) {  /* donate the slots requested  */
 				donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
             } else if( surplus > Math.ceil((FREE_SLOTS_LOW/(float)don_nodes))) {
@@ -454,8 +456,6 @@ public class ProgNormalNode extends Program {
         if(donated_slots > SLOTS_BY_MSG) {
             donated_slots = SLOTS_BY_MSG;
         }
-        this.println("Donated_slots="+donated_slots+" requester="+requester);
-        
  
         /* build the list of donated slots */
         int[] donatedSlotsList = new int[(int)donated_slots];
@@ -475,6 +475,8 @@ public class ProgNormalNode extends Program {
                 }
             }
         }
+        
+        this.println("Donated_slots:"+donatedSlotsList.length+" requester:"+requester +" List: "+Arrays.toString(donatedSlotsList));        
 
         SlotsMessageDonate donMsg = new SlotsMessageDonate(
                 msg.getSenderId(), donatedSlotsList.clone(), this.nodeId);     
@@ -579,10 +581,10 @@ public class ProgNormalNode extends Program {
 //	}        
 
         this.donorsNodes[msg.getSenderId()] = false;
-	this.println("free_slots="+this.getFreeSlots()+" free_slots_low="
+	this.println("free_slots:"+this.getFreeSlots()+" free_slots_low:"
                 +FREE_SLOTS_LOW);
-	this.println("owned_slots="+this.getOwnedSlots()+" max_owned_slots="
-                +this.maxOwnedSlots+" bm_donors="+ Arrays.toString(donorsNodes)); 
+	this.println("owned_slots:"+this.getOwnedSlots()+" max_owned_slots:"
+                +this.maxOwnedSlots+" bm_donors:"+ Arrays.toString(donorsNodes)); 
         
         if( this.state == STS_REQ_SLOTS && this.countActive(this.donorsNodes) == 0
                 && this.getOwnedSlots() == 0) {
@@ -671,12 +673,12 @@ public class ProgNormalNode extends Program {
                             this.primaryMember = mbr;
 			} else {
                             if(this.primaryMember != mbr) {
-                                this.println("SYS_PUT_STATUS: current primary_mbr="+
-                                        this.primaryMember+" differs from new primary_mbr="+
+                                this.println("SYS_PUT_STATUS: current primary_mbr:"+
+                                        this.primaryMember+" differs from new primary_mbr:"+
                                         mbr);
                             }
                             if(!this.isInitialized(mbr)) {
-                                this.println("SYS_PUT_STATUS: primary_mbr="+mbr+" is not in bm_init="+Arrays.toString(this.initializedNodes));
+                                this.println("SYS_PUT_STATUS: primary_mbr:"+mbr+" is not in bm_init:"+Arrays.toString(this.initializedNodes));
                             }
 			}
                         this.handleSlotsPutStatus((SlotsMessagePutStatus)msg);
@@ -725,7 +727,7 @@ public class ProgNormalNode extends Program {
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
             if(slotsTable[i].isUsed() && slotsTable[i].getOwner() == this.nodeId) {
                 if(slotsTable[i].processTimeLeft == 0) {
-                    println("Killing process["+i+"]");
+                    println("Killing process: "+i);
                     this.doExit(i);    
                     counter++;
                 } else {
@@ -753,8 +755,8 @@ public class ProgNormalNode extends Program {
     private int getPrimaryMember() {
         for(int i = 1; i < SlotsDonation.NODES; i++ ) {
             if (this.isInitialized(i)) {
-                println("bm_init="+Arrays.toString(this.initializedNodes)
-                        +" primary_mbr="+i);
+                println("bm_init:"+Arrays.toString(this.initializedNodes)
+                        +" primary_mbr:"+i);
                 return i;
             }
         }
@@ -773,7 +775,7 @@ public class ProgNormalNode extends Program {
         for(i = 1, wait_mbr = node; i < SlotsDonation.NODES; i++ ) {
             wait_mbr = (wait_mbr + 1) % SlotsDonation.NODES;
             if (this.bmWaitSts[wait_mbr]) {
-                println("next="+wait_mbr);
+                println("next:"+wait_mbr);
                 return(wait_mbr);
             }
         }
@@ -792,7 +794,7 @@ public class ProgNormalNode extends Program {
         for(i = 1, next_mbr = node; i < SlotsDonation.NODES; i++ ) {
             next_mbr = (next_mbr + 1) % SlotsDonation.NODES;
             if (this.isInitialized(next_mbr)) {
-                println("next="+next_mbr);
+                println("next:"+next_mbr);
                 return(next_mbr);
             }
         }
@@ -876,7 +878,7 @@ public class ProgNormalNode extends Program {
         if(this.nextMedianChange == 0) {
             this.arrivalMedian = this.getNextArrivalMedian();
             this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
-            println("Changed arrival median to "+ this.arrivalMedian);
+            println("Changed fork arrival median to: "+ this.arrivalMedian);
         } else {
             this.nextMedianChange--;
         }
@@ -885,7 +887,7 @@ public class ProgNormalNode extends Program {
         
         if (this.timeLeftToFork == 0) { // time for a new fork
             this.timeLeftToFork = this.getNextForkTime();
-            println("Next process in: "+this.timeLeftToFork);
+            //println("Next fork in: "+this.timeLeftToFork);
             if(this.isConnected() && this.isInitialized() && this.sysBarrier) {
                 this.tryFork();
             }
@@ -1030,7 +1032,7 @@ public class ProgNormalNode extends Program {
         } 
 	
 	if(this.getFreeSlots() == 0) {
-            this.println("No frees slot :(");
+            //this.println("No frees slot :(");
             this.counterForksFailed++;
             return(false);
 	} else {
