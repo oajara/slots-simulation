@@ -44,9 +44,21 @@ public class SlotsDonation extends Application {
           "TODO: complete this info";
     }
     
+    public void printParameters() {
+        System.out.println("NR_NODES: "+NODES+"\nSLOTS: "+TOTAL_SLOTS+
+                "\nMIN_OWNED_SLOTS: "+ProgNormalNode.MIN_OWNED_SLOTS+"\nFREE_SLOTS_LOW: "+
+                ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG+
+                "\nMEDIAN_CHANGE_INTERVAL: "+ProgNormalNode.MEDIAN_CHANGE_INTERVAL+"\nLT_UNIT: "+
+                ProgNormalNode.LT_UNIT+"\nLT_MIN: "+ProgNormalNode.LT_MIN+
+                "\nLT_MIN: "+ProgNormalNode.LT_MAX+"\nFI_MAX: "+
+                ProgNormalNode.FI_MAX+"\nFI_MIN: "+ProgNormalNode.FI_MIN+
+                "\nFI_RANGE: "+ProgNormalNode.FI_RANGE+"\nFI_MIN_AVG: "+
+                ProgNormalNode.FI_MIN_AVG+"\nFI_MAX_AVG: "+ProgNormalNode.FI_MAX_AVG);
+    }
+    
     @Override
     public void construct() {
-        
+        this.printParameters();
         this.nodes = new Node[NODES+1];
         
         /* create spread node at index zero */

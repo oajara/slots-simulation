@@ -21,18 +21,18 @@ public class ProgNormalNode extends Program {
     
     public static final int MAX_NEW_PROCS = 1;
     
-    private static final int MEDIAN_CHANGE_INTERVAL = 5000;
+    public static final int MEDIAN_CHANGE_INTERVAL = 5000;
     
-    private static final int LT_UNIT = 27;
-    private static final int LT_MIN = 1;
-    private static final int LT_MAX = 50;    
+    public static final int LT_UNIT = 35;
+    public static final int LT_MIN = 1;
+    public static final int LT_MAX = 50;    
     
-    private static final int FI_MAX=  20;
-    private static final int FI_MIN = 1;
-    private static final int FI_RANGE = 4;
+    public static final int FI_MAX=  20;
+    public static final int FI_MIN = 1;
+    public static final int FI_RANGE = 4;
     
-    private static final int FI_MIN_AVG = 5;
-    private static final int FI_MAX_AVG = 20;
+    public static final int FI_MIN_AVG = 5;
+    public static final int FI_MAX_AVG = 20;
     
    
 //    public static final int MIN_OWNED_SLOTS = 4;
@@ -92,7 +92,7 @@ public class ProgNormalNode extends Program {
         sleep(number);
         this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
         this.arrivalMedian = this.getNextArrivalMedian();
-        this.timeLeftToFork = this.getNextForkTime();
+        this.timeLeftToFork = getTime()+this.getNextDeltaFork();
 	this.doConnect();
         // Start with algorithm
         this.slotsLoop();
@@ -715,7 +715,8 @@ public class ProgNormalNode extends Program {
                 +"\nDonated To Me Slots: "+this.counterGotSlots
                 +"\nDonated By Me Slots: "+this.counterDonatedSlots
                 +"\nArrival Median: "+this.arrivalMedian
-                +"\nNext Fork in: "+this.timeLeftToFork;
+                +"\nNext Fork: "+this.timeLeftToFork
+                +"\nCurrent Time: "+getTime();
     }
     
     public void println(String str) {
@@ -883,10 +884,8 @@ public class ProgNormalNode extends Program {
             this.nextMedianChange--;
         }
         
-        this.timeLeftToFork--;
-        
-        if (this.timeLeftToFork == 0) { // time for a new fork
-            this.timeLeftToFork = this.getNextForkTime();
+        if (this.timeLeftToFork <= getTime()) { // time for a new fork
+            this.timeLeftToFork = getTime()+this.getNextDeltaFork();
             //println("Next fork in: "+this.timeLeftToFork);
             if(this.isConnected() && this.isInitialized() && this.sysBarrier) {
                 this.tryFork();
@@ -1060,7 +1059,7 @@ public class ProgNormalNode extends Program {
         return this.counterGotFirstSlotAt;
     }
 
-    private int getNextForkTime() {
+    private int getNextDeltaFork() {
         double val, next_float;
         
 //        do {
