@@ -600,6 +600,7 @@ public class ProgNormalNode extends Program {
         
         if (this.countActive(this.donorsNodes) == 0 && this.gotAtLeastOne == false) {
             this.counterGotZeroSlots++;
+			this.println("Got Zero Slots:"+counterGotZeroSlots);			
         } 
         
     }
