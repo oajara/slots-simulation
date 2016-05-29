@@ -1,4 +1,4 @@
-// NORMAL SLOT NODE - PAP 20160512
+// NORMAL SLOT NODE - PAP 20160529
 import daj.Message;
 import daj.Program;
 import java.util.*;
@@ -412,12 +412,19 @@ public class ProgNormalNode extends Program {
         if( this.state != STS_RUNNING) { /* PAP: ES EQUIVALENTE A TEST_BIT( FSM_state, BIT_REQUESTING)??*/
             donated_slots = 0;
         } else {
-            if (this.countActive(this.donorsNodes) > 0) {
-                println("concurrent request");
+			/* If local node it is also a requester, then: 
+			* consider the other requester as a PENDING donor which donates donated_slots = 0 
+			* only if it has not replied yet. 
+			* do not reply because the requester has already receipt my request
+			* if local node is the next member of the other requester, it must ALLWAYS reply
+			*/
+			if(	   (this.donorsNodes[requester] == true) 
+				&& (this.getNextInit(requester) != this.nodeId)  {
+                println("concurrent request with: "+requester);
                 this.donorsNodes[requester] = false;
                 return;
             }
-            
+					
             don_nodes = this.getInitializedNodes() - 1;
             assert( don_nodes > 0);
 
