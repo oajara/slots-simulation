@@ -23,16 +23,16 @@ public class ProgNormalNode extends Program {
     
     public static final int MEDIAN_CHANGE_INTERVAL = 5000;
     
-    public static final int LT_UNIT = 35;
+    public static final int LT_UNIT = 45;
     public static final int LT_MIN = 1;
-    public static final int LT_MAX = 50;    
+    public static final int LT_MAX = 100;    
     
-    public static final int FI_MAX=  20;
+    public static final int FI_MAX=  10;
     public static final int FI_MIN = 1;
     public static final int FI_RANGE = 4;
     
     public static final int FI_MIN_AVG = 5;
-    public static final int FI_MAX_AVG = 20;
+    public static final int FI_MAX_AVG = 10;
     
    
 //    public static final int MIN_OWNED_SLOTS = 4;
@@ -419,7 +419,7 @@ public class ProgNormalNode extends Program {
 			* if local node is the next member of the other requester, it must ALLWAYS reply
 			*/
 			if(	   (this.donorsNodes[requester] == true) 
-				&& (this.getNextInit(requester) != this.nodeId)  {
+				&& (this.getNextInit(requester) != this.nodeId))  {
                 println("concurrent request with: "+requester);
                 this.donorsNodes[requester] = false;
                 return;
