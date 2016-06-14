@@ -57,6 +57,5 @@ public class Slot {
     public void setStatus(int status) {
         this.status = status;
     }
-    
 
 }
