@@ -39,7 +39,7 @@ public class ProgSpreadNode extends Program {
     }
 
     private void receiveFromAll() {
-        println("Waiting for message...");
+//        println("Waiting for message...");
         int index = in().select();
         Message msg = in(index).receive();
 
@@ -47,9 +47,6 @@ public class ProgSpreadNode extends Program {
         if (msg instanceof SpreadMessage) {
             println("Receive "+ msg.getClass().toString() +" from Node#"+ ((SpreadMessage)msg).getSenderId());
             handleSpreadMessage((SpreadMessage)msg);
-        } else if (msg instanceof SlotsMessageTable) {
-            println("Receive " + msg.getClass().toString() + " from Node#" + ((SlotsMessage) msg).getSenderId());
-            handleUpdateTable((SlotsMessageTable) msg);
         } else {
             println("Receive "+ msg.getClass().toString() +" from Node#"+ ((SlotsMessage)msg).getSenderId());
             handleSlotsMessage((SlotsMessage)msg);

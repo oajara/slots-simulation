@@ -1,6 +1,10 @@
+import java.util.ArrayList;
+import java.util.List;
+
 public class SlotsMessagePutStatus extends SlotsMessage{
     
     Slot[] slotsTable;
+    private List<SlotsMessageRequestFork> requestQueue;
     boolean[] initializedNodes;
     int destination;
     
@@ -32,5 +36,13 @@ public class SlotsMessagePutStatus extends SlotsMessage{
     
     public int getDestination() {
         return this.destination;
-    }    
+    }
+
+    public List<SlotsMessageRequestFork> getRequestQueue() {
+        return requestQueue;
+    }
+
+    public void setRequestQueue(List<SlotsMessageRequestFork> requestQueue) {
+        this.requestQueue = requestQueue;
+    }
 }

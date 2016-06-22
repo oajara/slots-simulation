@@ -4,15 +4,17 @@
 public class SlotsMessageTable extends SlotsMessage {
     private Slot[] slotsTable;
 
-    public SlotsMessageTable(int senderId, Slot[] table) {
+    public SlotsMessageTable(int senderId, Slot[] slotsTable) {
         super(senderId);
-        this.slotsTable = table;
+
+        this.slotsTable = slotsTable;
     }
 
-    public void setTable(Slot[] table){
-        slotsTable = table;
-    }
-    public Slot[] getTable(){
+    public Slot[] getSlotsTable() {
         return slotsTable;
+    }
+
+    public void setSlotsTable(Slot[] slotsTable) {
+        this.slotsTable = slotsTable;
     }
 }

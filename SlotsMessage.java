@@ -14,5 +14,6 @@ public abstract class SlotsMessage extends Message {
     @Override
     public String getText() {
         return "Type : "+ this.getClass().toString();
-    }    
+    }
+
 }
