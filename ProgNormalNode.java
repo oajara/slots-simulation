@@ -19,8 +19,6 @@ public class ProgNormalNode extends Program {
     public static final int FREE_SLOTS_LOW = 0;
     public static final int SLOTS_BY_MSG = 1024;
 
-    public static final int MAX_NEW_PROCS = 1;
-
     public static final int MEDIAN_CHANGE_INTERVAL = 5000;
 
     public static final int LT_UNIT = 45;
@@ -35,15 +33,11 @@ public class ProgNormalNode extends Program {
     public static final int FI_MAX_AVG = 10;
 
 
-//    public static final int MIN_OWNED_SLOTS = 4;
-//    public static final int FREE_SLOTS_LOW = 2;
-//    public static final int SLOTS_BY_MSG = 3;
 
     private final Random random;
     private int arrivalMedian;
     private int nextMedianChange;
     private Slot[] slotsTable = new Slot[SlotsDonation.TOTAL_SLOTS];
-    //    private Process[] processTable = new Process[SlotsDonation.TOTAL_SLOTS];
     private boolean[] activeNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] initializedNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] donorsNodes = new boolean[SlotsDonation.MAX_NODES+1];
@@ -240,12 +234,6 @@ public class ProgNormalNode extends Program {
 
                 this.initializedNodes[this.nodeId] = true;
 
-                /* allocate all slots to the member */
-//                for (int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
-//                    slotsTable[i].setOwner(this.nodeId);
-//                    slotsTable[i].setStatus(Slot.STATUS_FREE);
-//                }
-
                 this.sysBarrier = true;
                 this.waiting2Fork = false;
 
@@ -314,13 +302,8 @@ public class ProgNormalNode extends Program {
                         }
                     }
                 }
-            } else if (this.getOwnedSlots() == 0 && this.countActive(this.donorsNodes) == 0) {
-                if (this.getWaitStsNodes() == 0) {
-                    this.state = STS_REQ_SLOTS;
-                    if(this.getInitializedNodes() > 1 )
-                        this.requestFork();
-                }
-            } else {
+            }
+            else {
                 return;
             }
 
@@ -336,8 +319,9 @@ public class ProgNormalNode extends Program {
 //            println("init_mbr="+initMbr+" bm_init="+Arrays.toString(this.initializedNodes));
 
             /* compute the slot high water threshold	*/
-            this.maxOwnedSlots = (SlotsDonation.TOTAL_SLOTS -
-                    (MIN_OWNED_SLOTS * (this.getInitializedNodes() - 1)));
+
+            this.maxOwnedSlots = SlotsDonation.TOTAL_SLOTS ;
+
 //            println("bm_init="+Arrays.toString(this.initializedNodes)+
 //                    " max_owned_slots="+this.maxOwnedSlots);
 
@@ -365,7 +349,10 @@ public class ProgNormalNode extends Program {
                 this.initializedNodes[i] = true;
             }
         }
-        this.requestQueue = msg.getRequestQueue();
+        this.requestQueue.clear();
+        for (int i = 0; i < msg.getRequestQueue().size() ; i++) {
+            this.requestQueue.add(msg.getRequestQueue().get(i));
+        }
         this.initializedNodes[this.nodeId] = true;
 
         this.println("Updated Initialized nodes table with: "+Arrays.toString(this.initializedNodes));
@@ -593,29 +580,6 @@ public class ProgNormalNode extends Program {
         this.broadcast(msg);
     }
 
-    /*===========================================================================*
-     *				mbr_rqst_slots
-     * It builds and broadcasts a message requesting slots
-     *===========================================================================*/
-    private void mbrRqstSlots(int nr_slots) {
-        this.println("Sending request of slots: " + nr_slots);
-
-        /* set donors*/
-        this.donorsNodes = cloneBitmapTable(this.initializedNodes);
-        this.donorsNodes[this.nodeId] = false;
-
-        if(this.countActive(this.donorsNodes) == 0) {
-            return;
-        }
-
-        SlotsMessageRequest msg = new SlotsMessageRequest(nr_slots,
-                this.getFreeSlots(), this.getOwnedSlots(), this.nodeId);
-        this.counterRequestedSlots = nr_slots + this.counterRequestedSlots;
-        this.gotAtLeastOne = false;
-        this.counterAtMessage = 0;
-        this.broadcast(msg);
-    }
-
     /****************
      * AUXILIARY
      ****************/
@@ -693,11 +657,9 @@ public class ProgNormalNode extends Program {
                 str += requestQueue.get(i).getSenderId()+", ";
             }
             str += " ]";
-            String str2 = "Replies Vector: ";
-            for (int i = 0; i < SlotsDonation.MAX_NODES; i++) {
-                str2 += receivedReplies[i]+", ";
-            }
-            println("owned slots: "+this.getOwnedSlots()+"; \n"+str+"\n"+str2);
+            println("owned slots: "+this.getOwnedSlots()+"\n"+str+"\n"+this.getStateAsString());
+
+
 
 
             //check fork or exit
@@ -894,8 +856,8 @@ public class ProgNormalNode extends Program {
 
         if (this.timeLeftToFork <= getTime()) { // time for a new fork
             this.timeLeftToFork = getTime()+this.getNextDeltaFork();
-            //println("Next fork in: "+this.timeLeftToFork);
-            if(this.isConnected() && this.isInitialized() && this.sysBarrier) {
+
+            if(this.isConnected() && this.isInitialized()) {
                 this.tryFork();
             }
         }
@@ -1010,9 +972,13 @@ public class ProgNormalNode extends Program {
         return cloneTable;
     }
 
-    public boolean tryFork() {
+    public void tryFork() {
         int freeSlot;
+
         // marco que soy un nodo interesado en la region critica
+        if (this.state == STS_WAIT_INIT || this.state == STS_WAIT_STATUS ){
+            return;
+        }
         interested = true;
         if(!waiting2Fork){ // me dieron el acceso a la region critica
             freeSlot = this.getFirstFreeSlot();
@@ -1020,7 +986,7 @@ public class ProgNormalNode extends Program {
                 this.releaseFork(false);
                 this.println("No free slot :(");
                 this.counterForksFailed++;
-                return false;
+                return;
             } // si hay slots libres
             else{
                 this.slotsTable[freeSlot].setOwner(this.nodeId);
@@ -1028,17 +994,16 @@ public class ProgNormalNode extends Program {
                 this.releaseFork(true);
                 println("Free slot found, forking");
                 this.counterForksSucceded++;
-                return true;
+                return;
             }
         }
         // si no te dieron el acceso
         this.requestFork();
-        return false;
+        return;
 
     }
 
     private void requestFork() {
-        int msgIndex = -1;
 
         if (this.getActiveNodes() == 1) {// si soy el unico miembro
             waiting2Fork = false;
@@ -1047,20 +1012,19 @@ public class ProgNormalNode extends Program {
         }
 
         // busco si tengo un request propio ya en la cola
-        for (int i = 0; i < requestQueue.size() ; i++) {
-            if (requestQueue.get(i).getSenderId() == this.nodeId){
-                msgIndex = i;
-                break;
+        if (!requestQueue.isEmpty()){
+            for (int i = 0; i < requestQueue.size() ; i++) {
+                if (requestQueue.get(i).getSenderId() == this.nodeId){
+                    return;
+                }
             }
         }
 
-        if( (!requestQueue.isEmpty()) && (msgIndex > -1)){ // si hay un resquest del nodo en el requestQueue
-            return; // seguimos esperando por los replies
-        }
         // agrego la peticion a mi propia cola
         int timeStamp = this.getTime();
         SlotsMessageRequestFork msg = new SlotsMessageRequestFork(this.nodeId, timeStamp);
-        this.insertMsg(requestQueue, msg);
+        this.insertMsg(msg);
+        println("Inserting own request on queue");
 
         // lo marcamos como recibido en el vector de reply recibidos
         receivedReplies[this.nodeId-1] = true;
@@ -1069,41 +1033,43 @@ public class ProgNormalNode extends Program {
         this.waiting2Fork = true;
     }
 
-    private void insertMsg(List<SlotsMessageRequestFork>  queue, final SlotsMessageRequestFork msg){
-        if (queue.isEmpty()){
-            queue.add(msg);
-        } else {
-            boolean exists = false;
-            for (int i = 0; i < queue.size(); i++) {
-                if (queue.get(i).getSenderId() == msg.getSenderId()){
-                    exists = true;
-                }
+    private void insertMsg(SlotsMessageRequestFork msg){
+
+//             insertamos y ordenamos por timestamp
+
+        requestQueue.add(msg);
+        Collections.sort(requestQueue, new Comparator<SlotsMessageRequestFork>() {
+            public int compare(SlotsMessageRequestFork msg1, SlotsMessageRequestFork msg2) {
+                return ((msg1.getTimeStamp()) - (msg2.getTimeStamp()));
             }
-            if (exists){
-                return;
-            }
-            queue.add(msg);
-            Collections.sort(queue, new Comparator<SlotsMessageRequestFork>() {
-                public int compare(SlotsMessageRequestFork msg1, SlotsMessageRequestFork msg2) {
-                    return ((msg1.getTimeStamp()) - (msg2.getTimeStamp()));
-                }
-            });
-        }
+        });
     }
 
     private void releaseFork(boolean succeded){
-        // soy el primero de la cola, me quito de la request queue
-        if(!requestQueue.isEmpty()){
+
+        if(!requestQueue.isEmpty() && requestQueue.get(0).getSenderId() == this.nodeId){
             requestQueue.remove(0);
+//            println("removed from resquest queue");
+            String str = "Request Queue: [ ";
+            for (int i = 0; i < requestQueue.size(); i++) {
+                str += requestQueue.get(i).getSenderId()+", ";
+            }
+            str += " ]";
+//            println(str);
+
         } else {
+            println("Error: Empty queue to remove request or the node was not allowed to fork");
             return;
         }
-        if(!succeded){ // si no habia slots
-            return;
-        }
+//        if(!succeded){ // si no habia slots
+//            return;
+//        }
         // informo  la nueva tabla de slots
-        SlotsMessageTable newProcessTable = new SlotsMessageTable(this.nodeId, this.slotsTable);
-        this.broadcast(newProcessTable);
+//        TODO: actualizar request queue no slot table
+        if(succeded){ // si se tomo algun slot se actuliza las tablas de todos los nodos
+            SlotsMessageTable newProcessTable = new SlotsMessageTable(this.nodeId, this.slotsTable);
+            this.broadcast(newProcessTable);
+        }
         // aviso a todos que libero la region critica
         SlotsMessageReleaseFork msg = new  SlotsMessageReleaseFork(this.nodeId);
         this.broadcast(msg);
@@ -1121,16 +1087,35 @@ public class ProgNormalNode extends Program {
     }
 
     private void handleRequestFork(SlotsMessageRequestFork msg){
+
         println("handling fork request from node: "+ msg.getSenderId());
-        this.insertMsg(requestQueue, msg);
+
+        // busco si el request ya esta en la cola
+        if (!requestQueue.isEmpty()){
+            for (int i = 0; i < requestQueue.size() ; i++) {
+                if (requestQueue.get(i).getSenderId() == msg.getSenderId()){
+                    return;
+                }
+            }
+        }
+
+        this.insertMsg(msg);
         int timeStamp = this.getTime();
         SlotsMessageReplyFork replyMsg = new SlotsMessageReplyFork(this.nodeId, timeStamp);
         broadcast(replyMsg);
+
+        String str = "Request Queue: [ ";
+        for (int i = 0; i < requestQueue.size(); i++) {
+            str += requestQueue.get(i).getSenderId()+", ";
+        }
+        str += " ]";
+//            println(str);
+
     }
 
     private void handleReplyFork(SlotsMessageReplyFork msg){
 
-        if (!interested){ // si no pedi para un fork, ignoro los REPLY
+        if (!interested || this.getActiveNodes() == 1){ // si no pedi para un fork, ignoro los REPLY
             return;
         }
 
@@ -1146,36 +1131,45 @@ public class ProgNormalNode extends Program {
         }
         if (allReceived){ // recibi todos los replies
             if (requestQueue.isEmpty()){ // cola de requerimientos vacia
-                println("Error pedido de fork con Request Queu vacia");
+                println("Error pedido de fork con Request Queue vacia");
                 return;
             }
             if(requestQueue.get(0).getSenderId() == this.nodeId){ // soy el primero
                 // puedo hacer el fork
                 waiting2Fork = false;
-                return;
             }
             else{ // no soy el primero
                 // sigo esperando
-                return;
             }
         }
     }
 
     private void handleReleaseFork(SlotsMessageReleaseFork msg){
         if (!requestQueue.isEmpty()){
-            requestQueue.remove(0);
+            if(msg.getSenderId() == requestQueue.get(0).getSenderId()){
+                requestQueue.remove(0);
+                String str = "Request Queue: [ ";
+                for (int i = 0; i < requestQueue.size(); i++) {
+                    str += requestQueue.get(i).getSenderId()+", ";
+                }
+                str += " ]";
+//                println(str);
+            }
+            else {
+                println("error releasing wrong slot");
+            }
         }
     }
 
     private int getFirstFreeSlot(){
-        int returnNumber = -1;
+        int returnNumber;
         for (int i = 0; i < SlotsDonation.TOTAL_SLOTS ; i++) {
             if(slotsTable[i].isFree()){
                 returnNumber = i;
-                break;
+                return returnNumber;
             }
         }
-        return returnNumber;
+        return -1;
     }
 
     public void doExit(int s) {
@@ -1197,15 +1191,6 @@ public class ProgNormalNode extends Program {
 
     private int getNextDeltaFork() {
         double val, next_float;
-
-//        do {
-//            val =  this.random.nextGaussian() * 50;
-//            /*
-//            (-50;50) el 70% de las veces (std dev 1)
-//            (-100;100) el 95% de las veces
-//            */
-//            next_float = val + this.arrivalMedian; // median correction
-//        } while (next_float < 0 || next_float > 100); // limits
 
         val =  this.random.nextGaussian() * FI_RANGE;
         /*
