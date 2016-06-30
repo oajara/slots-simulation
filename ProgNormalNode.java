@@ -412,9 +412,7 @@ public class ProgNormalNode extends Program {
         * ALL other initialized members respond to a request slot message 
         * but only members with enough slots will donate
         */
-        if( this.state != STS_RUNNING) { /* PAP: ES EQUIVALENTE A TEST_BIT( FSM_state, BIT_REQUESTING)??*/
-            donated_slots = 0;
-        } else {
+        if( this.countActive(this.donorsNodes) != 0) { 
 			/* If local node it is also a requester, then: 
 			* consider the other requester as a PENDING donor which donates donated_slots = 0 
 			* only if it has not replied yet. 
@@ -427,7 +425,8 @@ public class ProgNormalNode extends Program {
                 this.donorsNodes[requester] = false;
                 return;
             }
-					
+            donated_slots = 0;
+  		}else{			
             don_nodes = this.getInitializedNodes() - 1;
             assert( don_nodes > 0);
 
@@ -503,11 +502,6 @@ public class ProgNormalNode extends Program {
     private void handleSlotsDonation(SlotsMessageDonate msg) {
         this.println("Handling Slots Donate from Node#"+msg.getSenderId());
         
-        if(!(this.isInitialized())) {
-            println("I am not initialized nor waiting initialization. Return.");
-            return;
-        }
-
 	this.println("Donation of "+msg.getDonatedIdList().length+" slots from "
                 +msg.getSenderId()
                 +" to "+msg.getRequester());
@@ -551,6 +545,11 @@ public class ProgNormalNode extends Program {
                     } 
                     
                 }
+        }
+        
+        if(!(this.isInitialized())) {
+            println("I am not initialized nor waiting initialization. Return.");
+            return;
         }
         
         if(msg.getRequester() == this.nodeId){
