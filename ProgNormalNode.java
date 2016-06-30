@@ -369,7 +369,10 @@ public class ProgNormalNode extends Program {
         
 	/* The member is initialized but it hasn't got slots to start running */
         this.state = STS_REQ_SLOTS;
+        this.donorsNodes = cloneBitmapTable(this.initializedNodes);
+        this.donorsNodes[this.nodeId] = false;
 		this.println("Requesting slots");
+        
 	/* IMPLICIT SYS_REQ_SLOTS when JOIN->PUT_STATUS  */
     }
 
