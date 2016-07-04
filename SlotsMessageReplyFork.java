@@ -4,9 +4,9 @@
 public class SlotsMessageReplyFork extends SlotsMessage {
     private int timeStamp;
 
-    public SlotsMessageReplyFork(int senderId, int timeStamp) {
+    public SlotsMessageReplyFork(int senderId, int ts) {
         super(senderId);
-        this.timeStamp = timeStamp;
+        timeStamp = ts;
     }
 
     public int getTimeStamp() {

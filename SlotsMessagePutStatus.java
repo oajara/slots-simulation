@@ -5,6 +5,7 @@ public class SlotsMessagePutStatus extends SlotsMessage{
     
     Slot[] slotsTable;
     private List<SlotsMessageRequestFork> requestQueue;
+    private List<SlotsMessageReplyFork> receivedReplies;
     boolean[] initializedNodes;
     int destination;
     
@@ -44,5 +45,13 @@ public class SlotsMessagePutStatus extends SlotsMessage{
 
     public void setRequestQueue(List<SlotsMessageRequestFork> requestQueue) {
         this.requestQueue = requestQueue;
+    }
+
+    public List<SlotsMessageReplyFork> getReceivedReplies() {
+        return receivedReplies;
+    }
+
+    public void setReceivedReplies(List<SlotsMessageReplyFork> receivedReplies) {
+        this.receivedReplies = receivedReplies;
     }
 }
