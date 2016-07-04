@@ -217,17 +217,11 @@ public class ProgNormalNode extends Program {
 
             if (this.getActiveNodes() == 1) { 		/* It is a LONELY member*/
                 this.println("I'm the first active node");
-
 				/* it is ready to start running */
                 this.state = STS_RUNNING;
-
 				/* it is the Primary Member 	*/
                 this.primaryMember = this.nodeId;
-
                 this.initializedNodes[this.nodeId] = true;
-
-                this.sysBarrier = true;
-                this.waiting2Fork = false;
 
             } else {
 				/* Waiting Global status info */
@@ -602,9 +596,7 @@ public class ProgNormalNode extends Program {
     }
 
     private void processForkExit() {
-//        if (this.state == STS_WAIT_INIT || this.state == STS_WAIT_STATUS ){
-//            return;
-//        }
+
         if(this.nextMedianChange == 0) {
             this.arrivalMedian = this.getNextArrivalMedian();
             this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
@@ -674,7 +666,6 @@ public class ProgNormalNode extends Program {
         }
         return counter;
     }
-
 
     private void initGlobalVars() {
         this.state = STS_NEW;
@@ -839,7 +830,10 @@ public class ProgNormalNode extends Program {
         if(!requestQueue.isEmpty() && requestQueue.get(0).getSenderId() == this.nodeId){
             myTimeStamp = requestQueue.get(0).getTimeStamp();
             requestQueue.remove(0);
-
+        }
+        else {
+            println( "Realesing wronly without being the first");
+            return;
         }
 
         // informo  la nueva tabla de slots
@@ -859,10 +853,14 @@ public class ProgNormalNode extends Program {
         broadcast(replyMsg);
 
         // elimino replies viejos
-        for (int i = 0; i < receivedReplies.size() ; i++) {
-            receivedReplies.remove(i);
-        }
-
+//        List<SlotsMessageReplyFork> receivedRepliesNew = new ArrayList<SlotsMessageReplyFork>();
+//        for (int i = 0; i =< receivedReplies.size() ; i++) {
+//            if (myTimeStamp < receivedReplies.get(i).getTimeStamp()){
+//                receivedRepliesNew.add(receivedReplies.get(i));
+//            }
+//        }
+//        receivedReplies = receivedRepliesNew;
+        receivedReplies.clear();
     }
 
     private void handleUpdateTable(SlotsMessageTable msg){
@@ -984,7 +982,7 @@ public class ProgNormalNode extends Program {
                 requestQueue.remove(0);
             }
             else {
-                println("error releasing from wrong node");
+                println("error releasing from wrong node: "+msg.getSenderId());
             }
         }
         else {
