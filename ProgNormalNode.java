@@ -721,53 +721,70 @@ public class ProgNormalNode extends Program {
         return cloneTable;
     }
 
-    public void tryFork() {
-        int freeSlot;
 
-        // marco que soy un nodo interesado en la region critica
+    /**
+     * tryfork : funtion that tries to fork in case that it have permission from the group
+     */
+
+    public void tryFork() {
+        // index of the free slot seeked, -1 in case that there are not free slots
+        int freeSlot;
+        // set that i am interested en the critical region
         interested = true;
-        if(!waiting2Fork){ // me dieron el acceso a la region critica
+        // i get the access to the critical region
+        if(!waiting2Fork){
+            // take the first free slot
             freeSlot = this.getFirstFreeSlot();
-            if(freeSlot == -1){ // si no hay slots libres
+            // there is not any free slot
+            if(freeSlot == -1){
+                // release the critical region notifying that i do not take any slot
                 this.releaseFork(false);
                 this.println("No free slot :(");
                 this.counterForksFailed++;
                 return;
-            } // si hay slots libres
+            }
+            // there is one free slot, i take, mark ownership, mark used
             else{
                 this.slotsTable[freeSlot].setOwner(this.nodeId);
                 this.markSlotUsed();
+                // and release the critical region notifying that i take 1 slot for me
                 this.releaseFork(true);
                 println("Free slot found, forking");
                 this.counterForksSucceded++;
                 return;
             }
         }
-        // si no te dieron el acceso
+        // if i can not get access to the critical region, i request access
         this.requestFork();
         return;
     }
 
+    /**
+     * requestFork: in case that the node do not hace permission to fork, it require it
+     */
     private void requestFork() {
-
+        // boolean that indicate if the request already exist in the request queue
         boolean alreadyInQueue = false;
-
-        if (this.getActiveNodes() == 1) {// si soy el unico miembro
+        // i am the only member node, so i take the critical region for me
+        if (this.getActiveNodes() == 1) {
             waiting2Fork = false;
             println("I am the only member");
             return;
         }
-
-        // busco si tengo un request propio ya en la cola
+        // check if i already requested to fork
         if (!requestQueue.isEmpty()){
             for (int i = 0; i < requestQueue.size() ; i++) {
                 if (requestQueue.get(i).getSenderId() == this.nodeId){
                     alreadyInQueue = true;
                 }
             }
-        }// si no esta. inserto en la cola y envio el request a todos
+        }
+        // if i never requested, create the request message and multicast it
         int timeStamp = this.getTime();
         if (!alreadyInQueue){
+            // i need the state of the group that is going to reply me next
+            // so i take a "SnapShot" of the group.
+            // it may be replaced for a better object that really represent what i intended to
             this.activeNodesSnap = 0;
 
             for (int i = 0; i < SlotsDonation.NODES; i++) {
@@ -775,14 +792,13 @@ public class ProgNormalNode extends Program {
                 this.activeNodesSnap++;
                 }
             }
-            
+            // create the message, insert it in own request queue and send it
             SlotsMessageRequestFork msg = new SlotsMessageRequestFork(this.nodeId, timeStamp);
             println("Inserting own request on queue");
             this.insertRequestMsg(msg);
             this.broadcast(msg);
         }
-
-        // lo marcamos como recibido en el vector de reply recibidos
+        // check if the reply exist and then inserting it in case that do not exists
         boolean exists = false;
         for (int i = 0; i < receivedReplies.size(); i++) {
             if (this.nodeId == receivedReplies.get(i).getSenderId()){
@@ -793,12 +809,13 @@ public class ProgNormalNode extends Program {
             SlotsMessageReplyFork ownReply = new SlotsMessageReplyFork(this.nodeId, timeStamp);
             insertReplyMsg(ownReply);
         }
+        // mark my self as i am waiting the permission to fork
         this.waiting2Fork = true;
     }
 
     private void insertRequestMsg(SlotsMessageRequestFork msg){
 
-//      insertamos y ordenamos por timestamp
+        // insert message, and sort it by timeStamp
         requestQueue.add(msg);
         Collections.sort(requestQueue, new Comparator<SlotsMessageRequestFork>() {
             public int compare(SlotsMessageRequestFork msg1, SlotsMessageRequestFork msg2) {
@@ -809,8 +826,7 @@ public class ProgNormalNode extends Program {
 
     private void insertReplyMsg(SlotsMessageReplyFork msg){
 
-//             insertamos y ordenamos por timestamp
-
+        // insert message and sort it by node id
         receivedReplies.add(msg);
         Collections.sort(receivedReplies, new Comparator<SlotsMessageReplyFork>() {
             public int compare(SlotsMessageReplyFork msg1, SlotsMessageReplyFork msg2) {
@@ -819,14 +835,23 @@ public class ProgNormalNode extends Program {
         });
     }
 
+
+    /**
+     * releaseFork: in case that i had access to fork thar i requested, when i already take the slot, or not
+     * i realese the critical region, so other nodes can have access to it
+     * @param succeded: boolean that indicate if the node could take slots or not at tryFork
+     */
     private void releaseFork(boolean succeded){
+        // time stamp of the request that let me enter to the critical region
         int myTimeStamp = -1;
-        if (this.getActiveNodes() == 1) {// si soy el unico miembro
+        // i am the only member, so i mark that i am not waiting to fork anymore and i am not interested
+        // and return ignoring everything else
+        if (this.getActiveNodes() == 1) {
             waiting2Fork = true;
             interested = false;
             return;
         }
-
+        // get the timestamp and remove the request from my own request queue
         if(!requestQueue.isEmpty() && requestQueue.get(0).getSenderId() == this.nodeId){
             myTimeStamp = requestQueue.get(0).getTimeStamp();
             requestQueue.remove(0);
@@ -835,24 +860,25 @@ public class ProgNormalNode extends Program {
             println( "Realesing wronly without being the first");
             return;
         }
-
-        // informo  la nueva tabla de slots
-        if(succeded){ // si se tomo algun slot se actualiza las tablas de todos los nodos
+        // In case that i took a slot inform the new slots table to the group
+        if(succeded){
             SlotsMessageTable newProcessTable = new SlotsMessageTable(this.nodeId, this.slotsTable);
             this.broadcast(newProcessTable);
         }
-        // aviso a todos que libero la region critica
+        // notify to the group that the critical region now is free
         SlotsMessageReleaseFork msg = new  SlotsMessageReleaseFork(this.nodeId);
         this.broadcast(msg);
+        // i mark that i am not waiting to fork anymore and i am not interested
         this.waiting2Fork = true;
         this.interested = false;
-
-        // hago un reply implicito por los que no respondi por estar despues en la cola
+        // implicit reply because of the external requests that i ignore
+        // because they request later than me
         int timeStamp = this.getTime();
         SlotsMessageReplyFork replyMsg = new SlotsMessageReplyFork(this.nodeId, timeStamp);
         broadcast(replyMsg);
 
-        // elimino replies viejos
+        // TODO: see this bug
+        // Remove the old replies, not working right now as i intended, i have to fix this issue
 //        List<SlotsMessageReplyFork> receivedRepliesNew = new ArrayList<SlotsMessageReplyFork>();
 //        for (int i = 0; i =< receivedReplies.size() ; i++) {
 //            if (myTimeStamp < receivedReplies.get(i).getTimeStamp()){
@@ -860,23 +886,36 @@ public class ProgNormalNode extends Program {
 //            }
 //        }
 //        receivedReplies = receivedRepliesNew;
+
+        // provisionally clearing all the replies
         receivedReplies.clear();
     }
 
+    /**
+     * handleUpdateTable : serve the SlotsMessageTable from other node,
+     * it updates the slot table from the group changes because of their forks
+     * @param msg: message containing the new slot table
+     */
     private void handleUpdateTable(SlotsMessageTable msg){
         println("Slots Table Updated");
         slotsTable = msg.getSlotsTable();
     }
 
+    /**
+     * handleRequestFork: serves the SlotsMessageRequestFork message, replying in case that it is
+     * granting the fork that the node requests
+     * @param msg
+     */
     private void handleRequestFork(SlotsMessageRequestFork msg){
-
+        // the nodes that are not in the correct state should not reply
         if (this.state == STS_WAIT_INIT || this.state == STS_WAIT_STATUS ){
             return;
         }
 
         println("handling fork request from node: "+ msg.getSenderId());
-
-        // busco si el request ya esta en la cola
+        // look for the request in the queue
+        // if the request is already in the queue,
+        // the reply was sended and there is nothing to do here
         if (!requestQueue.isEmpty()){
             for (int i = 0; i < requestQueue.size() ; i++) {
                 if (requestQueue.get(i).getSenderId() == msg.getSenderId()){
@@ -884,19 +923,21 @@ public class ProgNormalNode extends Program {
                 }
             }
         }
-        // si estoy primero en la request queue no respondo el reply hasta liberar la region critica
+        // i am before the node that ask me to fork, i do not reply until
+        // i get to fork and realease the critical region
         if (iAmBefore(msg.getSenderId())){
             return;
         }
+        // the node that requested to fork is before me, so i reply the request
         this.insertRequestMsg(msg);
         int timeStamp = this.getTime();
         SlotsMessageReplyFork replyMsg = new SlotsMessageReplyFork(this.nodeId, timeStamp);
         broadcast(replyMsg);
-
-
-
     }
 
+    /**
+     * iAmBefore : check if a node is before another node in the request queue
+     */
     private boolean iAmBefore(int otherNodeId){
 
         int myPosition = -1;
@@ -923,37 +964,48 @@ public class ProgNormalNode extends Program {
 
     }
 
+    /**
+     * handleReplyFork: serve SlotsMessageReplyFork message, checking if the node can fork or not
+     * @param msg
+     */
     private void handleReplyFork(SlotsMessageReplyFork msg){
-
+        // to see if the reply exists in the received replies list
         boolean exists = false;
-
+        // the nodes that are not initialized can not answer this
         if (!this.isInitialized()){
             return;
         }
-
-        if (requestQueue.isEmpty()){ // cola de requerimientos vacia
-            println("Pedido de fork con Request Queue vacia");
+        // the request queu is empty there is an error
+        if (requestQueue.isEmpty()){
+            println("Fork request with empty Request Queue");
             return;
         }
-        // agrego el reply que recibi en el vector replies recibidos
+        // look for the reply if it exists
         for (int i = 0; i < receivedReplies.size(); i++) {
             if (msg.getSenderId() == receivedReplies.get(i).getSenderId()){
                 exists = true;
             }
         }
         if (!exists){
+            // it do nto exists, so i add it to received replies list
             insertReplyMsg(msg);
         }
-
-        if (receivedReplies.size() >= activeNodesSnap){ // recibi todos los replies
-
-            if(requestQueue.get(0).getSenderId() == this.nodeId){ // soy el primero
-                // puedo hacer el fork
+        // check if i received all the replies that had to received
+        // TODO: improve check
+        if (receivedReplies.size() >= activeNodesSnap){
+            // i received all the replies that i needed, i am the first node of the request queue
+            // i can fork
+            if(requestQueue.get(0).getSenderId() == this.nodeId){
                 waiting2Fork = false;
             }
         }
     }
 
+    /**
+     * checkRequest: auxiliary funtion that check more often if a node can fork
+     * does exactly the same thing as the handleReplyFork, but it do not manage replies,
+     * it just checks the critical region
+     */
     private void checkRequest(){
         if (!this.isInitialized()){
             return;
@@ -971,12 +1023,17 @@ public class ProgNormalNode extends Program {
         }
     }
 
+    /**
+     * handleReleaseFork: serves the SlotsMessageReleaseFork messages, it remove the request
+     * of the nodes that forked succesfully
+     * @param msg
+     */
     private void handleReleaseFork(SlotsMessageReleaseFork msg){
-
+        // the node do not have the correct state to handle this
         if (this.state == STS_WAIT_INIT || this.state == STS_WAIT_STATUS ){
             return;
         }
-
+        // check the request queue and remove the first request
         if (!requestQueue.isEmpty()){
             if(msg.getSenderId() == requestQueue.get(0).getSenderId()){
                 requestQueue.remove(0);
