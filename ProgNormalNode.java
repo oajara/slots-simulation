@@ -46,7 +46,6 @@ public class ProgNormalNode extends Program {
     private final int nodeId;
     private int state = STS_DISCONNECTED;
     private int primaryMember;
-    private boolean sysBarrier = false;
     private boolean pendingConnect = false;
 
     private boolean gotAtLeastOne = false;
@@ -66,7 +65,7 @@ public class ProgNormalNode extends Program {
 
     private List<SlotsMessageRequestFork> requestQueue = new ArrayList<SlotsMessageRequestFork>();
     private List<SlotsMessageReplyFork> receivedReplies = new ArrayList<SlotsMessageReplyFork>();
-    private int activeNodesSnap = 0;
+    private boolean[] initializedNodesSnapshot = new boolean[SlotsDonation.MAX_NODES+1];;
     private boolean waiting2Fork = true;
     private boolean interested = false;
 
@@ -177,7 +176,6 @@ public class ProgNormalNode extends Program {
                             this.state == STS_REQ_SLOTS &&
                             this.getOwnedSlots() == 0) {
                         this.state = STS_RUNNING;
-                        this.sysBarrier = true;
                     }
                     this.slotsTable[i].setOwner(this.primaryMember);
                 }
@@ -370,9 +368,9 @@ public class ProgNormalNode extends Program {
                     } else if (msg instanceof SlotsMessageDonate) {
 //                        this.handleSlotsDonation((SlotsMessageDonate)msg);
 
-						/*
-							Contrast Algorithm Handling
-						 */
+/*
+                        Contrast Algorithm Handling
+*/
                     } else if (msg instanceof SlotsMessageRequestFork) {
                         handleRequestFork((SlotsMessageRequestFork)msg);
                     } else if (msg instanceof SlotsMessageReplyFork) {
@@ -420,13 +418,14 @@ public class ProgNormalNode extends Program {
             }
             str1 += " ]";
 
-            println("owned slots: "+this.getOwnedSlots()+"  NodesSnap: "+this.activeNodesSnap+
-                    " active Nodes: "+this.getActiveNodes()+"\n"+str+"\n"+str1);
+            println("owned slots: "+this.getOwnedSlots()+"\n"+str+"\n"+str1);
 
             //check fork or exit
             this.processForkExit();
-            this.checkRequest();
-//            test((GlobalAssertion)this.slotsAssertion);
+            if (this.getActiveNodes() == SlotsDonation.NODES){
+                this.checkRequest();
+            }
+
         }
     }
 
@@ -674,7 +673,6 @@ public class ProgNormalNode extends Program {
         this.cleanSlotsLists();
 
         this.cleanCounterGotFirstAt();
-        this.sysBarrier = false;
         this.pendingConnect = false;
 
         this.cleanBinaryList(this.bmWaitSts);
@@ -723,7 +721,7 @@ public class ProgNormalNode extends Program {
 
 
     /**
-     * tryfork : funtion that tries to fork in case that it have permission from the group
+     * tryfork : function that tries to fork in case that it have permission from the group
      */
 
     public void tryFork() {
@@ -743,7 +741,7 @@ public class ProgNormalNode extends Program {
                 this.counterForksFailed++;
                 return;
             }
-            // there is one free slot, i take, mark ownership, mark used
+            // there is one free slot, i take it, mark ownership and mark used
             else{
                 this.slotsTable[freeSlot].setOwner(this.nodeId);
                 this.markSlotUsed();
@@ -760,7 +758,7 @@ public class ProgNormalNode extends Program {
     }
 
     /**
-     * requestFork: in case that the node do not hace permission to fork, it require it
+     * requestFork: in case that the node do not have permission to fork, it require it
      */
     private void requestFork() {
         // boolean that indicate if the request already exist in the request queue
@@ -784,12 +782,15 @@ public class ProgNormalNode extends Program {
         if (!alreadyInQueue){
             // i need the state of the group that is going to reply me next
             // so i take a "SnapShot" of the group.
-            // it may be replaced for a better object that really represent what i intended to
-            this.activeNodesSnap = 0;
+            for (int i = 0; i < initializedNodesSnapshot.length; i++) {
+                // clean the vector before request
+                this.initializedNodesSnapshot[i] = false;
+            }
 
-            for (int i = 0; i < SlotsDonation.NODES; i++) {
+            for (int i = 0; i < initializedNodesSnapshot.length; i++) {
                 if (this.isInitialized(i)){
-                this.activeNodesSnap++;
+                    // clone the initialized nodes vector
+                    this.initializedNodesSnapshot[i] = true;
                 }
             }
             // create the message, insert it in own request queue and send it
@@ -971,11 +972,12 @@ public class ProgNormalNode extends Program {
     private void handleReplyFork(SlotsMessageReplyFork msg){
         // to see if the reply exists in the received replies list
         boolean exists = false;
+        boolean receivedOk = true;
         // the nodes that are not initialized can not answer this
         if (!this.isInitialized()){
             return;
         }
-        // the request queu is empty there is an error
+        // the request queue is empty there is an error
         if (requestQueue.isEmpty()){
             println("Fork request with empty Request Queue");
             return;
@@ -992,7 +994,13 @@ public class ProgNormalNode extends Program {
         }
         // check if i received all the replies that had to received
         // TODO: improve check
-        if (receivedReplies.size() >= activeNodesSnap){
+        int boolean2int, boolean2intSs;
+        for (int i = 0; i < initializedNodesSnapshot.length; i++) {
+            boolean2int = (this.initializedNodes[i]) ? 1 : 0;
+            boolean2intSs = (this.initializedNodesSnapshot[i]) ? 1 : 0;
+            receivedOk &= (boolean2intSs <= boolean2int);
+        }
+        if (receivedOk){
             // i received all the replies that i needed, i am the first node of the request queue
             // i can fork
             if(requestQueue.get(0).getSenderId() == this.nodeId){
@@ -1007,6 +1015,9 @@ public class ProgNormalNode extends Program {
      * it just checks the critical region
      */
     private void checkRequest(){
+
+        boolean receivedOk = true;
+
         if (!this.isInitialized()){
             return;
         }
@@ -1014,8 +1025,13 @@ public class ProgNormalNode extends Program {
             println("Pedido de fork con Request Queue vacia");
             return;
         }
-        if ((activeNodesSnap != 0) && (receivedReplies.size() >= activeNodesSnap)){
-
+        int boolean2int, boolean2intSs;
+        for (int i = 0; i < initializedNodesSnapshot.length; i++) {
+            boolean2int = (this.initializedNodes[i]) ? 1 : 0;
+            boolean2intSs = (this.initializedNodesSnapshot[i]) ? 1 : 0;
+            receivedOk &= (boolean2intSs <= boolean2int);
+        }
+        if (receivedOk){
             if(requestQueue.get(0).getSenderId() == this.nodeId){ // soy el primero
                 // puedo hacer el fork
                 waiting2Fork = false;
