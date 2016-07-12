@@ -413,7 +413,9 @@ public class ProgNormalNode extends Program {
             }
             str1 += " ]";
 
-            println("owned slots: "+this.getOwnedSlots()+"\n"+str+"\n"+str1);
+            println("owned slots: "+this.getOwnedSlots());
+            println(str);
+            println(str1);
 
             //check fork or exit
             this.processForkExit();
