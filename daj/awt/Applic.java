@@ -5,26 +5,19 @@
 // (c) 1997, Wolfgang Schreiner <Wolfgang.Schreiner@risc.uni-linz.ac.at>
 // http://www.risc.uni-linz.ac.at/software/daj
 // --------------------------------------------------------------------------
+
+
 package daj.awt;
-import SlotsDonation;
+
+
+
+import daj.*;
 
 import java.applet.Applet;
-import java.awt.Button;
-import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Point;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import daj.Application;
-import daj.Assertion;
-import daj.Channel;
-import daj.Network;
-import daj.Node;
-import daj.Program;
-import daj.Scheduler;
-import daj.Selector;
-import daj.SelectorDefault;
+//import SlotsDonation;
 
 public abstract class Applic extends Applet implements ActionListener {
 
@@ -87,9 +80,9 @@ public abstract class Applic extends Applet implements ActionListener {
 		if (visualized) start();
 		network.run();
 	}
-        
+//        TODO: volver a copiar el archivo despues de modificar SlostsDonation.java
         public void writeInfo() {
-            (SlotsDonation(this)).writeInfo();
+//            (SlotsDonation(this)).writeInfo();
         }        
 
 	// --------------------------------------------------------------------------

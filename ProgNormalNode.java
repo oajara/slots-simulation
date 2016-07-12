@@ -32,8 +32,6 @@ public class ProgNormalNode extends Program {
     public static final int FI_MIN_AVG = 5;
     public static final int FI_MAX_AVG = 10;
 
-
-
     private final Random random;
     private int arrivalMedian;
     private int nextMedianChange;
@@ -47,9 +45,7 @@ public class ProgNormalNode extends Program {
     private int state = STS_DISCONNECTED;
     private int primaryMember;
     private boolean pendingConnect = false;
-
     private boolean gotAtLeastOne = false;
-
     private int counterForksSucceded = 0;
     private int counterForksFailed = 0;
     private int counterExits = 0;
@@ -67,7 +63,6 @@ public class ProgNormalNode extends Program {
     private List<SlotsMessageReplyFork> receivedReplies = new ArrayList<SlotsMessageReplyFork>();
     private boolean[] initializedNodesSnapshot = new boolean[SlotsDonation.MAX_NODES+1];;
     private boolean waiting2Fork = true;
-    private boolean interested = false;
 
     public ProgNormalNode(int id) {
         this.random = new Random();
@@ -727,8 +722,6 @@ public class ProgNormalNode extends Program {
     public void tryFork() {
         // index of the free slot seeked, -1 in case that there are not free slots
         int freeSlot;
-        // set that i am interested en the critical region
-        interested = true;
         // i get the access to the critical region
         if(!waiting2Fork){
             // take the first free slot
@@ -845,11 +838,10 @@ public class ProgNormalNode extends Program {
     private void releaseFork(boolean succeded){
         // time stamp of the request that let me enter to the critical region
         int myTimeStamp = -1;
-        // i am the only member, so i mark that i am not waiting to fork anymore and i am not interested
+        // i am the only member, so i mark that i am not waiting to fork anymore
         // and return ignoring everything else
         if (this.getActiveNodes() == 1) {
             waiting2Fork = true;
-            interested = false;
             return;
         }
         // get the timestamp and remove the request from my own request queue
@@ -869,9 +861,8 @@ public class ProgNormalNode extends Program {
         // notify to the group that the critical region now is free
         SlotsMessageReleaseFork msg = new  SlotsMessageReleaseFork(this.nodeId);
         this.broadcast(msg);
-        // i mark that i am not waiting to fork anymore and i am not interested
+        // i mark that i am not waiting to fork anymore
         this.waiting2Fork = true;
-        this.interested = false;
         // implicit reply because of the external requests that i ignore
         // because they request later than me
         int timeStamp = this.getTime();
@@ -889,7 +880,8 @@ public class ProgNormalNode extends Program {
 //        receivedReplies = receivedRepliesNew;
 
         // provisionally clearing all the replies
-        receivedReplies.clear();
+//        receivedReplies.clear();
+        receivedReplies = new ArrayList<SlotsMessageReplyFork>();
     }
 
     /**
@@ -993,7 +985,6 @@ public class ProgNormalNode extends Program {
             insertReplyMsg(msg);
         }
         // check if i received all the replies that had to received
-        // TODO: improve check
         int boolean2int, boolean2intSs;
         for (int i = 0; i < initializedNodesSnapshot.length; i++) {
             boolean2int = (this.initializedNodes[i]) ? 1 : 0;
@@ -1016,15 +1007,16 @@ public class ProgNormalNode extends Program {
      */
     private void checkRequest(){
 
+        if (requestQueue.isEmpty() || requestQueue.get(0).getSenderId() != this.nodeId){
+            return;
+        }
+
         boolean receivedOk = true;
 
         if (!this.isInitialized()){
             return;
         }
-        if (requestQueue.isEmpty()){ // cola de requerimientos vacia
-            println("Pedido de fork con Request Queue vacia");
-            return;
-        }
+
         int boolean2int, boolean2intSs;
         for (int i = 0; i < initializedNodesSnapshot.length; i++) {
             boolean2int = (this.initializedNodes[i]) ? 1 : 0;
@@ -1032,11 +1024,9 @@ public class ProgNormalNode extends Program {
             receivedOk &= (boolean2intSs <= boolean2int);
         }
         if (receivedOk){
-            if(requestQueue.get(0).getSenderId() == this.nodeId){ // soy el primero
-                // puedo hacer el fork
-                waiting2Fork = false;
-            }
+            waiting2Fork = false;
         }
+
     }
 
     /**
@@ -1055,7 +1045,8 @@ public class ProgNormalNode extends Program {
                 requestQueue.remove(0);
             }
             else {
-                println("error releasing from wrong node: "+msg.getSenderId());
+                // TODO: check why a node would receive a realease that is not from it first node on the request queue
+//                println("error releasing from wrong node: "+msg.getSenderId());
             }
         }
         else {

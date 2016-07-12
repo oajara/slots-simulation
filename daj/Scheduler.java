@@ -9,7 +9,7 @@ package daj;
 
 import daj.awt.NodeVisual;
 import daj.awt.Visualizer;
-import ProgNormalNode;
+//import ProgNormalNode;
 
 abstract public class Scheduler {
 
