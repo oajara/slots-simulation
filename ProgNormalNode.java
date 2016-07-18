@@ -59,9 +59,6 @@ public class ProgNormalNode extends Program {
     private int counterAtMessage = 0;
     private int timeLeftToFork;
 
-    private List<SlotsMessageRequestFork> requestQueue = new ArrayList<SlotsMessageRequestFork>();
-    private List<SlotsMessageReplyFork> receivedReplies = new ArrayList<SlotsMessageReplyFork>();
-    private boolean[] initializedNodesSnapshot = new boolean[SlotsDonation.MAX_NODES+1];;
     private boolean waiting2Fork = true;
 
     public ProgNormalNode(int id) {
@@ -297,8 +294,6 @@ public class ProgNormalNode extends Program {
             }
         }
 
-        this.requestQueue = msg.getRequestQueue();
-        this.receivedReplies = msg.getReceivedReplies();
         this.initializedNodes[this.nodeId] = true;
 
         this.println("Updated Initialized nodes table with: "+Arrays.toString(this.initializedNodes));
@@ -310,8 +305,7 @@ public class ProgNormalNode extends Program {
 	/* The member is initialized but it hasn't got slots to start running */
         this.state = STS_REQ_SLOTS;
         this.println("Requesting slots");
-	/* IMPLICIT SYS_REQ_SLOTS when JOIN->PUT_STATUS  */
-        this.requestFork();
+        this.multicastFork();
     }
 
 
@@ -324,8 +318,6 @@ public class ProgNormalNode extends Program {
 	/* Send the Global status info to new members */
         SlotsMessagePutStatus msg = new SlotsMessagePutStatus(
                 this.cloneSlotTable(this.slotsTable), cloneBitmapTable(this.initializedNodes), this.nodeId, destId);
-        msg.setRequestQueue(requestQueue);
-        msg.setReceivedReplies(receivedReplies);
         this.println("Broadcasting Global status from Node#"+this.nodeId+"to Node#"+destId);
         this.broadcast(msg);
     }
@@ -358,23 +350,15 @@ public class ProgNormalNode extends Program {
                         this.println("THIS SHOULD NOT HAPPEN!!! SpreadMessage non JOIN or LEAVE!");
                     }
                 } else if (this.isConnected()) {
-                    if(msg instanceof SlotsMessageRequest) {
-//                        this.handleSlotsRequest((SlotsMessageRequest)msg);
-                    } else if (msg instanceof SlotsMessageDonate) {
-//                        this.handleSlotsDonation((SlotsMessageDonate)msg);
-
 /*
                         Contrast Algorithm Handling
 */
-                    } else if (msg instanceof SlotsMessageRequestFork) {
-                        handleRequestFork((SlotsMessageRequestFork)msg);
-                    } else if (msg instanceof SlotsMessageReplyFork) {
-                        handleReplyFork((SlotsMessageReplyFork)msg);
-                    } else if (msg instanceof SlotsMessageReleaseFork) {
-                        handleReleaseFork((SlotsMessageReleaseFork) msg);
+                    if (msg instanceof SlotsMessageRequestFork) {
+                        handleFork((SlotsMessageRequestFork)msg);
                     } else if (msg instanceof SlotsMessageTable) {
-                        handleUpdateTable((SlotsMessageTable)msg);
+                        handleExit((SlotsMessageTable)msg);
                     }
+
 
                     else if (msg instanceof SlotsMessagePutStatus) {
                         mbr = ((SlotsMessagePutStatus)msg).getSenderId();
@@ -395,34 +379,21 @@ public class ProgNormalNode extends Program {
                         this.handleSlotsMergeStatus((SlotsMessageMergeStatus)msg);
                     } else {
                         this.println("UNHANDLED SLOT MESSAGE!!!");
+                        println(msg.getClass().getSimpleName());
                     }
                 } else {
                     this.println("Ignoring Slots Message. Node is not connected!");
                 }
             }
 
-            // debbugging!!!!
-            String str = "Request Queue: [ ";
-            for (int i = 0; i < requestQueue.size(); i++) {
-                str += requestQueue.get(i).getSenderId()+", ";
+            String str = "";
+            for (int i = 0; i < slotsTable.length ; i++) {
+                str += this.slotsTable[i].getOwner() + ", ";
             }
-            str += " ]";
-            String str1 = "Received replies: [ ";
-            for (int i = 0; i < receivedReplies.size(); i++) {
-                str1 += receivedReplies.get(i).getSenderId()+", ";
-            }
-            str1 += " ]";
-
             println("owned slots: "+this.getOwnedSlots());
-            println(str);
-            println(str1);
-
+//            println("Slot Table: "+str);
             //check fork or exit
             this.processForkExit();
-            if (this.getActiveNodes() == SlotsDonation.NODES){
-                this.checkRequest();
-            }
-
         }
     }
 
@@ -454,7 +425,10 @@ public class ProgNormalNode extends Program {
             if(slotsTable[i].isUsed() && slotsTable[i].getOwner() == this.nodeId) {
                 if(slotsTable[i].processTimeLeft == 0) {
                     println("Killing process: "+i);
-                    this.doExit(i);
+
+
+
+                    this.exitProcess(i);
                     counter++;
                 } else {
                     slotsTable[i].processTimeLeft--;
@@ -718,182 +692,31 @@ public class ProgNormalNode extends Program {
 
 
     /**
-     * tryfork : function that tries to fork in case that it have permission from the group
+     * tryfork : function that tries to fork
      */
 
     public void tryFork() {
         // index of the free slot seeked, -1 in case that there are not free slots
         int freeSlot;
-        // i get the access to the critical region
-        if(!waiting2Fork){
-            // take the first free slot
-            freeSlot = this.getFirstFreeSlot();
-            // there is not any free slot
-            if(freeSlot == -1){
-                // release the critical region notifying that i do not take any slot
-                this.releaseFork(false);
-                this.println("No free slot :(");
-                this.counterForksFailed++;
-                return;
-            }
-            // there is one free slot, i take it, mark ownership and mark used
-            else{
-                this.slotsTable[freeSlot].setOwner(this.nodeId);
-                this.markSlotUsed();
-                // and release the critical region notifying that i take 1 slot for me
-                this.releaseFork(true);
-                println("Free slot found, forking");
-                this.counterForksSucceded++;
-                return;
-            }
-        }
-        // if i can not get access to the critical region, i request access
-        this.requestFork();
-        return;
-    }
-
-    /**
-     * requestFork: in case that the node do not have permission to fork, it require it
-     */
-    private void requestFork() {
-        // boolean that indicate if the request already exist in the request queue
-        boolean alreadyInQueue = false;
-        // i am the only member node, so i take the critical region for me
-        if (this.getActiveNodes() == 1) {
-            waiting2Fork = false;
-            println("I am the only member");
+        freeSlot = this.getFirstFreeSlot();
+        // there is not any free slot
+        if (freeSlot == -1){
+            this.println("No free slot :(");
+            this.counterForksFailed++;
             return;
         }
-        // check if i already requested to fork
-        if (!requestQueue.isEmpty()){
-            for (int i = 0; i < requestQueue.size() ; i++) {
-                if (requestQueue.get(i).getSenderId() == this.nodeId){
-                    alreadyInQueue = true;
-                }
-            }
+
+        if (waiting2Fork){
+            multicastFork();
         }
-        // if i never requested, create the request message and multicast it
+
+    }
+
+    private void multicastFork(){
         int timeStamp = this.getTime();
-        if (!alreadyInQueue){
-            // i need the state of the group that is going to reply me next
-            // so i take a "SnapShot" of the group.
-            for (int i = 0; i < initializedNodesSnapshot.length; i++) {
-                // clean the vector before request
-                this.initializedNodesSnapshot[i] = false;
-            }
-
-            for (int i = 0; i < initializedNodesSnapshot.length; i++) {
-                if (this.isInitialized(i)){
-                    // clone the initialized nodes vector
-                    this.initializedNodesSnapshot[i] = true;
-                }
-            }
-            // create the message, insert it in own request queue and send it
-            SlotsMessageRequestFork msg = new SlotsMessageRequestFork(this.nodeId, timeStamp);
-            println("Inserting own request on queue");
-            this.insertRequestMsg(msg);
-            this.broadcast(msg);
-        }
-        // check if the reply exist and then inserting it in case that do not exists
-        boolean exists = false;
-        for (int i = 0; i < receivedReplies.size(); i++) {
-            if (this.nodeId == receivedReplies.get(i).getSenderId()){
-                exists = true;
-            }
-        }
-        if (!exists){
-            SlotsMessageReplyFork ownReply = new SlotsMessageReplyFork(this.nodeId, timeStamp);
-            insertReplyMsg(ownReply);
-        }
-        // mark my self as i am waiting the permission to fork
-        this.waiting2Fork = true;
-    }
-
-    private void insertRequestMsg(SlotsMessageRequestFork msg){
-
-        // insert message, and sort it by timeStamp
-        requestQueue.add(msg);
-        Collections.sort(requestQueue, new Comparator<SlotsMessageRequestFork>() {
-            public int compare(SlotsMessageRequestFork msg1, SlotsMessageRequestFork msg2) {
-                return ((msg1.getTimeStamp()) - (msg2.getTimeStamp()));
-            }
-        });
-    }
-
-    private void insertReplyMsg(SlotsMessageReplyFork msg){
-
-        // insert message and sort it by node id
-        receivedReplies.add(msg);
-        Collections.sort(receivedReplies, new Comparator<SlotsMessageReplyFork>() {
-            public int compare(SlotsMessageReplyFork msg1, SlotsMessageReplyFork msg2) {
-                return ((msg1.getSenderId()) - (msg2.getSenderId()));
-            }
-        });
-    }
-
-
-    /**
-     * releaseFork: in case that i had access to fork thar i requested, when i already take the slot, or not
-     * i realese the critical region, so other nodes can have access to it
-     * @param succeded: boolean that indicate if the node could take slots or not at tryFork
-     */
-    private void releaseFork(boolean succeded){
-        // time stamp of the request that let me enter to the critical region
-        int myTimeStamp = -1;
-        // i am the only member, so i mark that i am not waiting to fork anymore
-        // and return ignoring everything else
-        if (this.getActiveNodes() == 1) {
-            waiting2Fork = true;
-            return;
-        }
-        // get the timestamp and remove the request from my own request queue
-        if(!requestQueue.isEmpty() && requestQueue.get(0).getSenderId() == this.nodeId){
-            myTimeStamp = requestQueue.get(0).getTimeStamp();
-            requestQueue.remove(0);
-        }
-        else {
-            println( "Realesing wronly without being the first");
-            return;
-        }
-        // In case that i took a slot inform the new slots table to the group
-        if(succeded){
-            SlotsMessageTable newProcessTable = new SlotsMessageTable(this.nodeId, this.slotsTable);
-            this.broadcast(newProcessTable);
-        }
-        // notify to the group that the critical region now is free
-        SlotsMessageReleaseFork msg = new  SlotsMessageReleaseFork(this.nodeId);
+        SlotsMessageRequestFork msg = new SlotsMessageRequestFork(this.nodeId, timeStamp);
+        println("Inserting own request on queue");
         this.broadcast(msg);
-        // i mark that i am not waiting to fork anymore
-        this.waiting2Fork = true;
-        // implicit reply because of the external requests that i ignore
-        // because they request later than me
-        int timeStamp = this.getTime();
-        SlotsMessageReplyFork replyMsg = new SlotsMessageReplyFork(this.nodeId, timeStamp);
-        broadcast(replyMsg);
-
-        // TODO: see this bug
-        // Remove the old replies, not working right now as i intended, i have to fix this issue
-//        List<SlotsMessageReplyFork> receivedRepliesNew = new ArrayList<SlotsMessageReplyFork>();
-//        for (int i = 0; i =< receivedReplies.size() ; i++) {
-//            if (myTimeStamp < receivedReplies.get(i).getTimeStamp()){
-//                receivedRepliesNew.add(receivedReplies.get(i));
-//            }
-//        }
-//        receivedReplies = receivedRepliesNew;
-
-        // provisionally clearing all the replies
-//        receivedReplies.clear();
-        receivedReplies = new ArrayList<SlotsMessageReplyFork>();
-    }
-
-    /**
-     * handleUpdateTable : serve the SlotsMessageTable from other node,
-     * it updates the slot table from the group changes because of their forks
-     * @param msg: message containing the new slot table
-     */
-    private void handleUpdateTable(SlotsMessageTable msg){
-        println("Slots Table Updated");
-        slotsTable = msg.getSlotsTable();
     }
 
     /**
@@ -901,158 +724,22 @@ public class ProgNormalNode extends Program {
      * granting the fork that the node requests
      * @param msg
      */
-    private void handleRequestFork(SlotsMessageRequestFork msg){
-        // the nodes that are not in the correct state should not reply
-        if (this.state == STS_WAIT_INIT || this.state == STS_WAIT_STATUS ){
-            return;
+    private void handleFork(SlotsMessageRequestFork msg){
+
+        // index of the free slot seeked, -1 in case that there are not free slots
+        int freeSlot = this.getFirstFreeSlot();
+        int sender = msg.getSenderId();
+
+        // there is a free slot
+        if (freeSlot != -1){
+            this.slotsTable[freeSlot].setOwner(sender);
         }
 
-        println("handling fork request from node: "+ msg.getSenderId());
-        // look for the request in the queue
-        // if the request is already in the queue,
-        // the reply was sended and there is nothing to do here
-        if (!requestQueue.isEmpty()){
-            for (int i = 0; i < requestQueue.size() ; i++) {
-                if (requestQueue.get(i).getSenderId() == msg.getSenderId()){
-                    return;
-                }
-            }
-        }
-        // i am before the node that ask me to fork, i do not reply until
-        // i get to fork and realease the critical region
-        if (iAmBefore(msg.getSenderId())){
-            return;
-        }
-        // the node that requested to fork is before me, so i reply the request
-        this.insertRequestMsg(msg);
-        int timeStamp = this.getTime();
-        SlotsMessageReplyFork replyMsg = new SlotsMessageReplyFork(this.nodeId, timeStamp);
-        broadcast(replyMsg);
-    }
-
-    /**
-     * iAmBefore : check if a node is before another node in the request queue
-     */
-    private boolean iAmBefore(int otherNodeId){
-
-        int myPosition = -1;
-        int otherNodePosition = -1;
-
-        for (int i = 0; i < requestQueue.size(); i++) {
-            if (requestQueue.get(i).getSenderId() == this.nodeId){
-                myPosition = i;
-                break;
-            }
-        }
-        for (int i = 0; i < requestQueue.size(); i++) {
-            if (requestQueue.get(i).getSenderId() == otherNodeId){
-                otherNodePosition = i;
-                break;
-            }
-        }
-        if (myPosition == -1 || otherNodePosition == -1){
-            println("error with iAmBefore function");
-            return false;
-        }
-
-        return (myPosition < otherNodePosition);
-
-    }
-
-    /**
-     * handleReplyFork: serve SlotsMessageReplyFork message, checking if the node can fork or not
-     * @param msg
-     */
-    private void handleReplyFork(SlotsMessageReplyFork msg){
-        // to see if the reply exists in the received replies list
-        boolean exists = false;
-        boolean receivedOk = true;
-        // the nodes that are not initialized can not answer this
-        if (!this.isInitialized()){
-            return;
-        }
-        // the request queue is empty there is an error
-        if (requestQueue.isEmpty()){
-            println("Fork request with empty Request Queue");
-            return;
-        }
-        // look for the reply if it exists
-        for (int i = 0; i < receivedReplies.size(); i++) {
-            if (msg.getSenderId() == receivedReplies.get(i).getSenderId()){
-                exists = true;
-            }
-        }
-        if (!exists){
-            // it do nto exists, so i add it to received replies list
-            insertReplyMsg(msg);
-        }
-        // check if i received all the replies that had to received
-        int boolean2int, boolean2intSs;
-        for (int i = 0; i < initializedNodesSnapshot.length; i++) {
-            boolean2int = (this.initializedNodes[i]) ? 1 : 0;
-            boolean2intSs = (this.initializedNodesSnapshot[i]) ? 1 : 0;
-            receivedOk &= (boolean2intSs <= boolean2int);
-        }
-        if (receivedOk){
-            // i received all the replies that i needed, i am the first node of the request queue
-            // i can fork
-            if(requestQueue.get(0).getSenderId() == this.nodeId){
-                waiting2Fork = false;
-            }
-        }
-    }
-
-    /**
-     * checkRequest: auxiliary funtion that check more often if a node can fork
-     * does exactly the same thing as the handleReplyFork, but it do not manage replies,
-     * it just checks the critical region
-     */
-    private void checkRequest(){
-
-        if (requestQueue.isEmpty() || requestQueue.get(0).getSenderId() != this.nodeId){
-            return;
-        }
-
-        boolean receivedOk = true;
-
-        if (!this.isInitialized()){
-            return;
-        }
-
-        int boolean2int, boolean2intSs;
-        for (int i = 0; i < initializedNodesSnapshot.length; i++) {
-            boolean2int = (this.initializedNodes[i]) ? 1 : 0;
-            boolean2intSs = (this.initializedNodesSnapshot[i]) ? 1 : 0;
-            receivedOk &= (boolean2intSs <= boolean2int);
-        }
-        if (receivedOk){
+        if (msg.getSenderId() == this.nodeId){
+            println("Free slot found, forking");
+            this.markSlotUsed();
+            this.counterForksSucceded++;
             waiting2Fork = false;
-        }
-
-    }
-
-    /**
-     * handleReleaseFork: serves the SlotsMessageReleaseFork messages, it remove the request
-     * of the nodes that forked succesfully
-     * @param msg
-     */
-    private void handleReleaseFork(SlotsMessageReleaseFork msg){
-        // the node do not have the correct state to handle this
-        if (this.state == STS_WAIT_INIT || this.state == STS_WAIT_STATUS ){
-            return;
-        }
-        // check the request queue and remove the first request
-        if (!requestQueue.isEmpty()){
-            if(msg.getSenderId() == requestQueue.get(0).getSenderId()){
-                requestQueue.remove(0);
-            }
-            else {
-                // TODO: check why a node would receive a realease that is not from it first node on the request queue
-//                println("error releasing from wrong node: "+msg.getSenderId());
-            }
-        }
-        else {
-            println("Attempting to release on empty request queue");
         }
     }
 
@@ -1065,15 +752,17 @@ public class ProgNormalNode extends Program {
         return -1;
     }
 
-    public void doExit(int s) {
-        //println("Executing exit of a process");
-        if(slotsTable[s].isUsed() && slotsTable[s].getOwner() == this.nodeId) {
-            slotsTable[s].setStatus(Slot.STATUS_FREE);
-            SlotsMessageTable newProcessTable = new SlotsMessageTable(this.nodeId, this.slotsTable);
-            this.broadcast(newProcessTable);
+    private void exitProcess(int slotIndex){
+        SlotsMessageTable newProcessTable = new SlotsMessageTable(this.nodeId, slotIndex);
+        this.broadcast(newProcessTable);
+    }
+
+    private void handleExit(SlotsMessageTable msg){
+        int slotFree = msg.getSlotIndex();
+        if(slotsTable[slotFree].isUsed()){
+            slotsTable[slotFree].setStatus(Slot.STATUS_FREE);
         } else {
-            this.println("ERROR: this slot is not owned by node or is not used: "
-                    + s);
+            this.println("ERROR: this slot is not used: " + slotFree);
         }
         this.counterExits++;
     }

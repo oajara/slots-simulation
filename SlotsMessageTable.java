@@ -2,19 +2,18 @@
  * Created by fer on 11/06/16.
  */
 public class SlotsMessageTable extends SlotsMessage {
-    private Slot[] slotsTable;
+    private int slotIndex;
 
-    public SlotsMessageTable(int senderId, Slot[] slotsTable) {
+    public SlotsMessageTable(int senderId, int slotIndex) {
         super(senderId);
-
-        this.slotsTable = slotsTable;
+        this.slotIndex = slotIndex;
     }
 
-    public Slot[] getSlotsTable() {
-        return slotsTable;
+    public int getSlotIndex() {
+        return slotIndex;
     }
 
-    public void setSlotsTable(Slot[] slotsTable) {
-        this.slotsTable = slotsTable;
+    public void setSlotIndex(int slotIndex) {
+        this.slotIndex = slotIndex;
     }
 }
