@@ -59,8 +59,6 @@ public class ProgNormalNode extends Program {
     private int counterAtMessage = 0;
     private int timeLeftToFork;
 
-    private boolean waiting2Fork = true;
-
     public ProgNormalNode(int id) {
         this.random = new Random();
         this.nodeId = id;
@@ -252,7 +250,6 @@ public class ProgNormalNode extends Program {
 
         if(initMbr != this.nodeId) {
             this.bmWaitSts[initMbr] = false;
-//            println("init_mbr="+initMbr+" bm_waitsts="+Arrays.toString(this.bmWaitSts));
             if(this.state == STS_RUNNING) {
                 if(this.primaryMember == this.nodeId) {
                     if (this.getWaitStsNodes() != 0) {
@@ -264,6 +261,7 @@ public class ProgNormalNode extends Program {
                 }
             }
             else {
+                println("I am not running");
                 return;
             }
 
@@ -286,7 +284,6 @@ public class ProgNormalNode extends Program {
 	/* bm_init considerer the bitmap sent by primary_mbr ORed by 					*/
 	/* the bitmap of those nodes initialized before SYS_PUT_STATUS message arrives 	*/
         boolean[] received = cloneBitmapTable(msg.getInitializedNodes());
-//        this.println("Received init bitmap: "+Arrays.toString(received));
 
         for(int i = 1; i <= SlotsDonation.MAX_NODES; i++) {
             if(received[i] == true) {
@@ -302,10 +299,9 @@ public class ProgNormalNode extends Program {
         // ESTO ESTA BIEN??
         this.slotsTable = this.cloneSlotTable(msg.getSlotsTable());
 
-	/* The member is initialized but it hasn't got slots to start running */
-        this.state = STS_REQ_SLOTS;
-        this.println("Requesting slots");
-        this.multicastFork();
+//	/* The member is initialized but it hasn't got slots to start running */
+        this.state = STS_RUNNING;
+//        this.multicastFork();
     }
 
 
@@ -393,7 +389,9 @@ public class ProgNormalNode extends Program {
             println("owned slots: "+this.getOwnedSlots());
 //            println("Slot Table: "+str);
             //check fork or exit
-            this.processForkExit();
+            if (this.getInitializedNodes() == 24){
+                this.processForkExit();
+            }
         }
     }
 
@@ -425,9 +423,6 @@ public class ProgNormalNode extends Program {
             if(slotsTable[i].isUsed() && slotsTable[i].getOwner() == this.nodeId) {
                 if(slotsTable[i].processTimeLeft == 0) {
                     println("Killing process: "+i);
-
-
-
                     this.exitProcess(i);
                     counter++;
                 } else {
@@ -438,14 +433,16 @@ public class ProgNormalNode extends Program {
     }
 
     /** find first owned free slot and use it **/
-    private void markSlotUsed() {
-        for(int i = 0; i<SlotsDonation.TOTAL_SLOTS; i++) {
-            if(slotsTable[i].isFree() && slotsTable[i].getOwner() == this.nodeId) {
-                slotsTable[i].setStatus(Slot.STATUS_USED);
-                slotsTable[i].setProcessLifetime(this.getRandomProcessLifeTime());
-                println("Created a process["+i+"] of lifetime "+slotsTable[i].processTimeLeft);
-                return;
+    private void markSlotUsed(int slotIndex) {
+
+        if(slotsTable[slotIndex].isFree()) {
+            slotsTable[slotIndex].setStatus(Slot.STATUS_USED);
+            if (slotsTable[slotIndex].getOwner() == this.nodeId){
+                slotsTable[slotIndex].setProcessLifetime(this.getRandomProcessLifeTime());
+                println("Created a process["+slotIndex+"] of lifetime "+slotsTable[slotIndex].processTimeLeft);
             }
+        } else {
+            println("Error Slot was not free");
         }
     }
 
@@ -695,7 +692,8 @@ public class ProgNormalNode extends Program {
      * tryfork : function that tries to fork
      */
 
-    public void tryFork() {
+    public void   tryFork() {
+        println("trying to fork");
         // index of the free slot seeked, -1 in case that there are not free slots
         int freeSlot;
         freeSlot = this.getFirstFreeSlot();
@@ -705,10 +703,8 @@ public class ProgNormalNode extends Program {
             this.counterForksFailed++;
             return;
         }
-
-        if (waiting2Fork){
-            multicastFork();
-        }
+        multicastFork();
+        this.state = STS_REQ_SLOTS;
 
     }
 
@@ -719,27 +715,22 @@ public class ProgNormalNode extends Program {
         this.broadcast(msg);
     }
 
-    /**
-     * handleRequestFork: serves the SlotsMessageRequestFork message, replying in case that it is
-     * granting the fork that the node requests
-     * @param msg
-     */
     private void handleFork(SlotsMessageRequestFork msg){
-
-        // index of the free slot seeked, -1 in case that there are not free slots
-        int freeSlot = this.getFirstFreeSlot();
         int sender = msg.getSenderId();
 
-        // there is a free slot
-        if (freeSlot != -1){
-            this.slotsTable[freeSlot].setOwner(sender);
+        if(sender != this.nodeId){
+            println("Received fork message from node: "+ sender);
         }
-
-        if (msg.getSenderId() == this.nodeId){
-            println("Free slot found, forking");
-            this.markSlotUsed();
-            this.counterForksSucceded++;
-            waiting2Fork = false;
+        // index of the free slot seeked, -1 in case that there are not free slots
+        int freeSlot = this.getFirstFreeSlot();
+        // there is a free slot
+        if (freeSlot > -1){
+            this.slotsTable[freeSlot].setOwner(sender);
+            this.markSlotUsed(freeSlot);
+            if (msg.getSenderId() == this.nodeId){
+                println("Own message received, Free slot found, forking");
+                this.counterForksSucceded++;
+            }
         }
     }
 
@@ -758,7 +749,13 @@ public class ProgNormalNode extends Program {
     }
 
     private void handleExit(SlotsMessageTable msg){
+        int senderId = msg.getSenderId();
         int slotFree = msg.getSlotIndex();
+        if (senderId != this.nodeId){
+            println("Received exit message from: "+ senderId);
+        } else {
+            println("Received own exit message");
+        }
         if(slotsTable[slotFree].isUsed()){
             slotsTable[slotFree].setStatus(Slot.STATUS_FREE);
         } else {
