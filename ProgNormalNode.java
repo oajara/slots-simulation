@@ -16,8 +16,8 @@ public class ProgNormalNode extends Program {
 
     public static final int NO_PRIMARY_MBR = -1;
 
-    public static final int MIN_OWNED_SLOTS = 0;
-    public static final int FREE_SLOTS_LOW = 0;
+    public static final int MIN_OWNED_SLOTS = 8;
+    public static final int FREE_SLOTS_LOW = 4;
     public static final int SLOTS_BY_MSG = 1024;
 
     public static final int MEDIAN_CHANGE_INTERVAL = 5000;
@@ -289,12 +289,17 @@ public class ProgNormalNode extends Program {
 
         if (this.timeLeftToFork <= getTime()) { // time for a new fork
             this.timeLeftToFork = getTime()+this.getNextDeltaFork();
+            
 
-            if(this.isConnected() && this.isInitialized() &&
-                    this.state != STS_PENDING_FORK) {
-                this.tryFork();
+            if(!this.isConnected() || !this.isInitialized()) {
+                this.println("[ERROR] I'm not connected or not init or waiting for FORK reply");
+                return;
+            }
+            
+            if (this.state == STS_PENDING_FORK) {
+                this.println("Cannot try another fork. Waiting on FORK reply.");
             } else {
-                this.println("I'm not connected or not init");
+                this.tryFork();
             }
         }
 
