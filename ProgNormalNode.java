@@ -15,8 +15,8 @@ public class ProgNormalNode extends Program {
     
     public static final int NO_PRIMARY_MBR = -1;
     
-    public static final int MIN_OWNED_SLOTS = 8;
-    public static final int FREE_SLOTS_LOW = 4;
+    public static final int MIN_OWNED_SLOTS = 16;
+    public static final int FREE_SLOTS_LOW = 8;
     public static final int SLOTS_BY_MSG = 1024;
     
     public static final int MAX_NEW_PROCS = 1;
@@ -434,16 +434,23 @@ public class ProgNormalNode extends Program {
             println("free_slots:"+ this.getFreeSlots()+" free_slots_low:"+FREE_SLOTS_LOW
                     +" needed_slots:"+msg.getNeedSlots()+" don_nodes:"+don_nodes
                     +" surplus:"+surplus);
-			if( surplus > Math.ceil(msg.getNeedSlots()/(float)don_nodes)) {  /* donate the slots requested  */
-				donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
-            } else if( surplus > Math.ceil((FREE_SLOTS_LOW/(float)don_nodes))) {
-                /* donate slots at least up to complete the minimal number of free slots */
-                donated_slots = Math.ceil((FREE_SLOTS_LOW/(float)don_nodes));
-            } else if( surplus > 0 ) { /* donate at least one */
-                donated_slots = 1;
-            } else {
+            if( surplus <= 0) {
                 donated_slots = 0;
-            }
+            } else if( surplus > Math.ceil(msg.getNeedSlots()/(float)don_nodes)) { /* donate the slots requested */
+		donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
+            } else {
+                donated_slots = surplus;
+            }             
+//	    if( surplus > Math.ceil(msg.getNeedSlots()/(float)don_nodes)) {  /* donate the slots requested  */
+//				donated_slots = Math.ceil(msg.getNeedSlots()/(float)don_nodes);
+//            } else if( surplus > Math.ceil((FREE_SLOTS_LOW/(float)don_nodes))) {
+//                /* donate slots at least up to complete the minimal number of free slots */
+//                donated_slots = Math.ceil((FREE_SLOTS_LOW/(float)don_nodes));
+//            } else if( surplus > 0 ) { /* donate at least one */
+//                donated_slots = 1;
+//            } else {
+//                donated_slots = 0;
+//            }
         }
         
 	/* if the local node does not have slots to donate and have no pending donation response to requester*/
