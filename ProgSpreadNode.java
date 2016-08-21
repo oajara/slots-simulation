@@ -10,13 +10,13 @@ TODO: generalizar vector shuffle: max 64, pasar actual length como param
 
 public class ProgSpreadNode extends Program {
     int broadcasted = 0;
-    private final boolean[] registeredNodes = new boolean[SlotsDonation.MAX_NODES+1];
-    private final MessageCounter[] counters = new MessageCounter[SlotsDonation.MAX_NODES+1];
+    private final boolean[] registeredNodes = new boolean[SlotsDonation.NODES+1];
+    private final MessageCounter[] counters = new MessageCounter[SlotsDonation.NODES+1];
     private Node[] nodeList;
 
     public ProgSpreadNode() {
         /* no nodes at the beggining */
-        for (int i = 0; i <= SlotsDonation.MAX_NODES; i++ ) {
+        for (int i = 0; i <= SlotsDonation.NODES; i++ ) {
             registeredNodes[i] = false;
             counters[i] = new MessageCounter();
             counters[i].reset();
@@ -117,7 +117,7 @@ public class ProgSpreadNode extends Program {
 
     private boolean[] cloneBitmapTable(boolean[] table) {
         boolean[] cloneTable;
-        cloneTable = Arrays.copyOf(table, SlotsDonation.MAX_NODES+1);
+        cloneTable = Arrays.copyOf(table, SlotsDonation.NODES+1);
         return cloneTable;
     }
 
@@ -125,8 +125,12 @@ public class ProgSpreadNode extends Program {
     private void sendToAll(Message msg) {
         /* send to  all active nodes, including requester */
         //println("Sending message to all active nodes...");
-        int[] vector = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
-        //int[] vector = {1,2,3,4};
+        //int[] vector = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
+        //int[] vector = {1,2,3,4};        
+        int[] vector = new int[SlotsDonation.NODES];
+        for (int i = 0; i < vector.length; i++) {
+            vector[i] = i + 1;
+        }
         int[] shuff = Testing.RandomizeArray(vector);
 
         for(int i=0; i<SlotsDonation.NODES; i++){
@@ -140,13 +144,13 @@ public class ProgSpreadNode extends Program {
 
 
     public void getInfoLine() {
-        int[] counterGotFirstSlotAt = new int[SlotsDonation.MAX_NODES-1];
+        int[] counterGotFirstSlotAt = new int[SlotsDonation.NODES-1];
         //(NodeId, Forks OK, Forks Failed, Exits)
         //System.out.println("0,"+this.
         int counters[] = new int[8];
         for(int j = 0; j <= 7; j++) { //type of message
             counters[j] = 0;
-            for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) { //node#
+            for (int i = 1; i <= SlotsDonation.NODES; i++ ) { //node#
                 counters[j] = this.counters[i].get(j) + counters[j];
             }
         }
@@ -166,14 +170,14 @@ public class ProgSpreadNode extends Program {
 
 
 
-        for(int n = 1; n <= SlotsDonation.MAX_NODES; n++) {
-            for(int c = 0; c < SlotsDonation.MAX_NODES-1; c++) {
+        for(int n = 1; n <= SlotsDonation.NODES; n++) {
+            for(int c = 0; c < SlotsDonation.NODES-1; c++) {
                 counterGotFirstSlotAt[c] += ((ProgNormalNode)(this.nodeList[n].getProgram())).getCounterGotFirstAt()[c];
             }
         }
 
         System.out.println("At Message,Counter");
-        for(int c = 0; c < SlotsDonation.MAX_NODES-1; c++) {
+        for(int c = 0; c < SlotsDonation.NODES-1; c++) {
             System.out.println(""+(c+1)+","+ counterGotFirstSlotAt[c]);
         }
 
@@ -182,7 +186,7 @@ public class ProgSpreadNode extends Program {
     public String getText() {
         int count = 0;
         String msgs = new String();
-        for (int i = 1; i <= SlotsDonation.MAX_NODES; i++ ) {
+        for (int i = 1; i <= SlotsDonation.NODES; i++ ) {
             if (this.isActive(i)) {
                 count ++;
             }

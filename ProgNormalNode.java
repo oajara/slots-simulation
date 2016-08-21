@@ -12,10 +12,6 @@ public class ProgNormalNode extends Program {
     public static final int STS_REQ_SLOTS = 6;
     public static final int STS_NEW = 7;
     public static final int STS_MERGE_STATUS = 8;
-    public static final int STS_PENDING_FORK = 9;
-    public static final int STS_PENDING_SLOTS_REQ = 9;
-    public static final int STS_PENDING_GIVE_AWAY = 10;    
-    
     
     public static final int FREE_LOW = 4;
     public static final int FREE_HIGH = 8;
@@ -64,6 +60,9 @@ public class ProgNormalNode extends Program {
     private int[] counterGotFirstSlotAt = new int[SlotsDonation.MAX_NODES-1];
     private int counterAtMessage = 0;
     private int timeLeftToFork;
+    
+    private boolean pendingTake = false;
+    private boolean pendingGiveAway = false;
 
     public ProgNormalNode(int id) {
         this.random = new Random();
@@ -128,6 +127,7 @@ public class ProgNormalNode extends Program {
     }
 
     private void slotsLoop() {
+        this.state = STS_RUNNING;
         Message msg;
         while(true) {
 //            this.println("Waiting for message...");
@@ -145,7 +145,7 @@ public class ProgNormalNode extends Program {
 */
                     if (msg instanceof SlotsMessageTakeSlots) {
                         this.handleTakeSlots((SlotsMessageTakeSlots)msg);
-                    } else if (msg instanceof SlotsMessageExit) {
+                    } else if (msg instanceof SlotsMessageGiveAway) {
                         this.handleGiveAway((SlotsMessageGiveAway)msg);
                     } else {
                         this.println("UNHANDLED SLOT MESSAGE!!!");
@@ -168,24 +168,43 @@ public class ProgNormalNode extends Program {
     
     private void handleTakeSlots(SlotsMessageTakeSlots msg) {
         int takenSlots = msg.getQuantity();
+        int[] takenArray = new int[takenSlots];
         for (int i = 0; i < takenSlots; i++) {
             int freeSlot = this.getFirstFreeHomelessSlotIndex();
             if(freeSlot != -1) {
                 this.slotsTable[freeSlot].setOwner(msg.senderId);
                 this.slotsTable[freeSlot].setStatus(Slot.STATUS_FREE);
+                takenArray[i] = freeSlot;
             } else {
-                println("[ERROR] No free slot to take!");
+                println("No free slot to take!");
+                // end loop
+                takenArray[i] = -1;
             }
+        }
+        
+        this.println("Handling Take["+takenSlots+"] message from node#"+
+                msg.getSenderId()+". Now he owns: "
+                +Arrays.toString(takenArray));       
+        
+        if(msg.getSenderId() == this.nodeId) {
+            this.pendingTake = false;
         }
     }
     
     private void handleGiveAway(SlotsMessageGiveAway msg) {
         int[] indexes = msg.getIndexes();
+        
+        this.println("Received GiveAway message from Node#"+msg.getSenderId()+": "
+                +Arrays.toString(indexes));
         for(int i = 0; i < indexes.length; i++) {
-            this.slotsTable[i].setOwner(Slot.NO_OWNER);
-            this.slotsTable[i].setStatus(Slot.STATUS_FREE);
+            this.slotsTable[i].setStatus(Slot.STATUS_DONATING);
+        }
+        
+        if(msg.getSenderId() == this.nodeId) {
+            this.pendingGiveAway = false;
         }
     }    
+    
     
     /*
     Check if we need to request or donate slots.
@@ -193,25 +212,30 @@ public class ProgNormalNode extends Program {
     private void slotsManagement() {
         // check if I need to take slots
         if (this.getFreeSlots() < 1) {
-            if(this.state != STS_PENDING_SLOTS_REQ) {
-                this.state = STS_PENDING_SLOTS_REQ;
+            if(! this.pendingTake) {
                 this.broadcastTakeSlots();
             } else {
-                this.println("I have zero slots but already broadcasted msg");
+                //this.println("I have zero slots but broadcasted TAKE already. State: "
+                //+ this.getStateAsString());
             }
         }
         
         // check if I have too many slots and need to give away
         if (this.getFreeSlots() >= FREE_HIGH) {
-            int[] slotsIndexes  = this.getGiveAwaySlots();
-            this.state = STS_PENDING_GIVE_AWAY;
-            this.broadcastGiveAwaySlots(slotsIndexes);
+            if(! this.pendingGiveAway) {
+                int[] slotsIndexes  = this.getGiveAwaySlots();
+                this.broadcastGiveAwaySlots(slotsIndexes);
+            } else {
+                this.println("I have many slots but broadcasted GiveAwat already. State: "
+                + this.getStateAsString());
+            }
         }
     }
     
     private void broadcastGiveAwaySlots(int[] slotsIndexes) {
         this.println("Broadcasting Give Away Message: "+ Arrays.toString(slotsIndexes));
         SlotsMessageGiveAway msg = new SlotsMessageGiveAway(slotsIndexes, this.nodeId);
+        this.pendingGiveAway = true;
         this.broadcast(msg);
     }    
     
@@ -222,13 +246,16 @@ public class ProgNormalNode extends Program {
         int indexes[] = new int[GIVE_AWAY];
         for(int i = 0; i < GIVE_AWAY; i++) {
             indexes[i] = this.getFirstOwnedFreeSlotIndex();
+            this.slotsTable[indexes[i]].setStatus(Slot.STATUS_DONATING);
+            //this.slotsTable[indexes[i]].setStatus(Slot.NO_OWNER);
         }
         return indexes;
     }
     
     private void broadcastTakeSlots() {
-        this.println("Broadcasting Take Message for "+FREE_LOW+ "slots");
-        SlotsMessageTakeSlots msg = new SlotsMessageTakeSlots(this.nodeId,FREE_LOW);
+        this.println("Broadcasting Take Message for "+FREE_LOW+ " slots");
+        SlotsMessageTakeSlots msg = new SlotsMessageTakeSlots(FREE_LOW,this.nodeId);
+        this.pendingTake = true;
         this.broadcast(msg);
     }
 
@@ -251,7 +278,17 @@ public class ProgNormalNode extends Program {
     }
 
     public void println(String str) {
-        System.out.println("Node[" + nodeId + "]("+getTime()+"): "+str);
+        String st;
+        if(this.pendingGiveAway && this.pendingTake) {
+            st = "T-GA";
+        } else if (this.pendingGiveAway) {
+            st = "GA";
+        } else if (this.pendingTake) {
+            st = "T";
+        } else {
+            st = "R";
+        }        
+        System.out.println("Node[" + nodeId + "][" + st + "]("+getTime()+"): "+str);
     }
 
     public void decProcessesLifetimes() {
@@ -307,8 +344,6 @@ public class ProgNormalNode extends Program {
                 return "New ??";
             case STS_MERGE_STATUS:
                 return "Merge ??";
-            case STS_PENDING_SLOTS_REQ:
-                return "Slot request is pending";                
             default:
                 return "Unknown Status: "+this.state;
         }
@@ -416,13 +451,12 @@ public class ProgNormalNode extends Program {
     }
 
     public boolean tryFork() {
-        println("Trying to fork");
         // index of the free slot seeked, -1 in case that there are not free slots
         int freeSlotIndex;
         freeSlotIndex = this.getFirstOwnedFreeSlotIndex();
         // there is not any free slot
         if (freeSlotIndex == -1){
-            this.println("No free slot :(");
+            this.println("Failed fork. No free slot :(");
             this.counterForksFailed++;
             return false;
         } else {
@@ -455,6 +489,7 @@ public class ProgNormalNode extends Program {
         this.counterExits++;
         //avoid killing again and again
         this.slotsTable[slotIndex].processTimeLeft = -1;
+        this.slotsTable[slotIndex].status = Slot.STATUS_FREE;
         this.println("Terminating process in Slot "+slotIndex);
     }
 
