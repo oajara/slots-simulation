@@ -3,6 +3,7 @@ public class Slot {
     int status;
     int processTimeLeft;
     
+    public static final int NO_OWNER = -1;
     public static final int STATUS_FREE = 0;
     public static final int STATUS_USED = 1;
     public static final int STATUS_DONATING = 2;

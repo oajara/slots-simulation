@@ -13,6 +13,13 @@ public class ProgNormalNode extends Program {
     public static final int STS_NEW = 7;
     public static final int STS_MERGE_STATUS = 8;
     public static final int STS_PENDING_FORK = 9;
+    public static final int STS_PENDING_SLOTS_REQ = 9;
+    public static final int STS_PENDING_GIVE_AWAY = 10;    
+    
+    
+    public static final int FREE_LOW = 4;
+    public static final int FREE_HIGH = 8;
+    public static final int GIVE_AWAY = 4;
 
     public static final int NO_PRIMARY_MBR = -1;
 
@@ -62,11 +69,7 @@ public class ProgNormalNode extends Program {
         this.random = new Random();
         this.nodeId = id;
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
-            slotsTable[i] = new Slot(0, Slot.STATUS_FREE, 0);
-            
-            // start with all slots owned by Node 1
-//            slotsTable[i] = new Slot(1, Slot.STATUS_FREE, 0);
-            
+            slotsTable[i] = new Slot(Slot.NO_OWNER, Slot.STATUS_FREE, 0);
         }
 
         this.cleanNodesLists();
@@ -140,10 +143,10 @@ public class ProgNormalNode extends Program {
 /*
                         Contrast Algorithm Handling
 */
-                    if (msg instanceof SlotsMessageRequestFork) {
-                        handleFork((SlotsMessageRequestFork)msg);
+                    if (msg instanceof SlotsMessageTakeSlots) {
+                        this.handleTakeSlots((SlotsMessageTakeSlots)msg);
                     } else if (msg instanceof SlotsMessageExit) {
-                        handleExit((SlotsMessageExit)msg);
+                        this.handleGiveAway((SlotsMessageGiveAway)msg);
                     } else {
                         this.println("UNHANDLED SLOT MESSAGE!!!");
                         println(msg.getClass().getSimpleName());
@@ -156,10 +159,77 @@ public class ProgNormalNode extends Program {
             //check fork or exit
             if (this.getInitializedNodes() == SlotsDonation.NODES){
                 this.processForkExit();
+                this.slotsManagement();
             } else {
                 this.println("Not all nodes init. Nodes Init: "+this.getInitializedNodes());
             }
         }
+    }
+    
+    private void handleTakeSlots(SlotsMessageTakeSlots msg) {
+        int takenSlots = msg.getQuantity();
+        for (int i = 0; i < takenSlots; i++) {
+            int freeSlot = this.getFirstFreeHomelessSlotIndex();
+            if(freeSlot != -1) {
+                this.slotsTable[freeSlot].setOwner(msg.senderId);
+                this.slotsTable[freeSlot].setStatus(Slot.STATUS_FREE);
+            } else {
+                println("[ERROR] No free slot to take!");
+            }
+        }
+    }
+    
+    private void handleGiveAway(SlotsMessageGiveAway msg) {
+        int[] indexes = msg.getIndexes();
+        for(int i = 0; i < indexes.length; i++) {
+            this.slotsTable[i].setOwner(Slot.NO_OWNER);
+            this.slotsTable[i].setStatus(Slot.STATUS_FREE);
+        }
+    }    
+    
+    /*
+    Check if we need to request or donate slots.
+    */
+    private void slotsManagement() {
+        // check if I need to take slots
+        if (this.getFreeSlots() < 1) {
+            if(this.state != STS_PENDING_SLOTS_REQ) {
+                this.state = STS_PENDING_SLOTS_REQ;
+                this.broadcastTakeSlots();
+            } else {
+                this.println("I have zero slots but already broadcasted msg");
+            }
+        }
+        
+        // check if I have too many slots and need to give away
+        if (this.getFreeSlots() >= FREE_HIGH) {
+            int[] slotsIndexes  = this.getGiveAwaySlots();
+            this.state = STS_PENDING_GIVE_AWAY;
+            this.broadcastGiveAwaySlots(slotsIndexes);
+        }
+    }
+    
+    private void broadcastGiveAwaySlots(int[] slotsIndexes) {
+        this.println("Broadcasting Give Away Message: "+ Arrays.toString(slotsIndexes));
+        SlotsMessageGiveAway msg = new SlotsMessageGiveAway(slotsIndexes, this.nodeId);
+        this.broadcast(msg);
+    }    
+    
+    /*
+    get list of slot indexes I will give away
+    */
+    private int[] getGiveAwaySlots() {
+        int indexes[] = new int[GIVE_AWAY];
+        for(int i = 0; i < GIVE_AWAY; i++) {
+            indexes[i] = this.getFirstOwnedFreeSlotIndex();
+        }
+        return indexes;
+    }
+    
+    private void broadcastTakeSlots() {
+        this.println("Broadcasting Take Message for "+FREE_LOW+ "slots");
+        SlotsMessageTakeSlots msg = new SlotsMessageTakeSlots(this.nodeId,FREE_LOW);
+        this.broadcast(msg);
     }
 
 
@@ -198,11 +268,16 @@ public class ProgNormalNode extends Program {
     }
     
     private void createProcess(int slotIndex) {
-        if (slotsTable[slotIndex].getOwner() != this.nodeId){
+        if (slotsTable[slotIndex].getOwner() != this.nodeId ){
             this.println("[ERROR] I don't own this slot!");
             return;
         }
+        if (slotsTable[slotIndex].getStatus() != Slot.STATUS_FREE ){
+            this.println("[ERROR] This slot is not free!");
+            return;
+        }        
         slotsTable[slotIndex].setProcessLifetime(this.getRandomProcessLifeTime());
+        this.slotsTable[slotIndex].setStatus(Slot.STATUS_USED);
         println("Created a process["+slotIndex+"] of lifetime "+slotsTable[slotIndex].processTimeLeft);
     }
 
@@ -232,6 +307,8 @@ public class ProgNormalNode extends Program {
                 return "New ??";
             case STS_MERGE_STATUS:
                 return "Merge ??";
+            case STS_PENDING_SLOTS_REQ:
+                return "Slot request is pending";                
             default:
                 return "Unknown Status: "+this.state;
         }
@@ -279,6 +356,7 @@ public class ProgNormalNode extends Program {
     }
 
     private void processForkExit() {
+        // check if it's time to change the process arrival median
         if(this.nextMedianChange == 0) {
             this.arrivalMedian = this.getNextArrivalMedian();
             this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
@@ -287,24 +365,18 @@ public class ProgNormalNode extends Program {
             this.nextMedianChange--;
         }
 
-        if (this.timeLeftToFork <= getTime()) { // time for a new fork
-            this.timeLeftToFork = getTime()+this.getNextDeltaFork();
-            
-
-            if(!this.isConnected() || !this.isInitialized()) {
-                this.println("[ERROR] I'm not connected or not init or waiting for FORK reply");
-                return;
-            }
-            
-            if (this.state == STS_PENDING_FORK) {
-                this.println("Cannot try another fork. Waiting on FORK reply.");
-            } else {
-                this.tryFork();
-            }
-        }
-
-        if(this.isConnected() && this.isInitialized()) {
+        // if we are connected and init we can try stuff
+        if(!this.isConnected() || !this.isInitialized()) {
+            this.println("[ERROR] I'm not connected or not init");
+        } else {
+            // check process that need to finish
             this.decProcessesLifetimes();
+            
+            // time to new process?
+            if (this.timeLeftToFork <= getTime()) { // time for a new fork
+                this.timeLeftToFork = getTime()+this.getNextDeltaFork();
+                this.tryFork();
+            }            
         }
     }
 
@@ -328,14 +400,6 @@ public class ProgNormalNode extends Program {
         return counter;
     }
 
-    private void initGlobalVars() {
-        this.state = STS_NEW;
-        this.cleanNodesLists();
-        this.cleanSlotsLists();
-        this.cleanCounterGotFirstAt();
-        this.cleanBinaryList(this.bmWaitSts);
-    }
-
     private void cleanBinaryList(boolean[] list) {
         for(int i = 1; i < list.length; i++) {
             list[i] = false;
@@ -351,69 +415,36 @@ public class ProgNormalNode extends Program {
         }
     }
 
-    private void cleanCounterGotFirstAt() {
-        for(int i = 0; i < SlotsDonation.MAX_NODES-1; i++) {
-            this.counterGotFirstSlotAt[i] = 0;
-        }
-    }
-
-    private void cleanSlotsLists() {
-        for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
-            this.slotsTable[i] = new Slot();
-        }
-    }
-
-    /**
-     * tryfork : function that tries to fork
-     */
-
-    public void tryFork() {
+    public boolean tryFork() {
         println("Trying to fork");
         // index of the free slot seeked, -1 in case that there are not free slots
-        int freeSlot;
-        freeSlot = this.getFirstFreeSlot();
+        int freeSlotIndex;
+        freeSlotIndex = this.getFirstOwnedFreeSlotIndex();
         // there is not any free slot
-        if (freeSlot == -1){
+        if (freeSlotIndex == -1){
             this.println("No free slot :(");
             this.counterForksFailed++;
-            return;
+            return false;
+        } else {
+            this.createProcess(freeSlotIndex);
+            return true;
         }
-        multicastFork();
     }
 
-    private void multicastFork(){
-        int timeStamp = this.getTime();
-        SlotsMessageRequestFork msg = new SlotsMessageRequestFork(this.nodeId, timeStamp);
-        println("Multikasting FORK");
-        this.broadcast(msg);
-        this.state = STS_PENDING_FORK;
-    }
-
-    private void handleFork(SlotsMessageRequestFork msg){
-        int sender = msg.getSenderId();
-
-        if(sender != this.nodeId){
-            println("Received fork message from node: "+ sender);
-        }
-        // index of the free slot seeked, -1 in case that there are not free slots
-        int freeSlot = this.getFirstFreeSlot();
-        // there is a free slot
-        if (freeSlot > -1){
-            this.slotsTable[freeSlot].setOwner(sender);
-            this.slotsTable[freeSlot].setStatus(Slot.STATUS_USED);
-            if (msg.getSenderId() == this.nodeId){
-                println("Own message received, Free slot found, forking. Slot: "
-                +freeSlot);
-                this.counterForksSucceded++;
-                this.createProcess(freeSlot);
-                this.state = STS_RUNNING;
+    private int getFirstFreeHomelessSlotIndex(){
+        for (int i = 0; i < SlotsDonation.TOTAL_SLOTS ; i++) {
+            if(slotsTable[i].getOwner() == Slot.NO_OWNER
+                    && slotsTable[i].isFree()){
+                return i;
             }
         }
-    }
+        return -1;
+    }    
 
-    private int getFirstFreeSlot(){
+    private int getFirstOwnedFreeSlotIndex(){
         for (int i = 0; i < SlotsDonation.TOTAL_SLOTS ; i++) {
-            if(slotsTable[i].isFree()){
+            if(slotsTable[i].getOwner() == this.nodeId
+                    && slotsTable[i].isFree()){
                 return i;
             }
         }
@@ -424,21 +455,7 @@ public class ProgNormalNode extends Program {
         this.counterExits++;
         //avoid killing again and again
         this.slotsTable[slotIndex].processTimeLeft = -1;
-        this.println("Broadcasting EXIT message for Slot "+slotIndex);
-        SlotsMessageExit MessageExit = new SlotsMessageExit(
-                this.nodeId, slotIndex);
-        this.broadcast(MessageExit);
-    }
-
-    private void handleExit(SlotsMessageExit msg){
-        int senderId = msg.getSenderId();
-        int slotFree = msg.getSlotIndex();
-        if(!slotsTable[slotFree].isUsed()){
-            this.println("ERROR: this slot is not used: " + slotFree);
-        }
-            
-        this.println("Received exit message from Node "+ senderId +" Slot "+slotFree);
-        slotsTable[slotFree].setStatus(Slot.STATUS_FREE);
+        this.println("Terminating process in Slot "+slotIndex);
     }
 
     public int[] getCounterGotFirstAt() {
