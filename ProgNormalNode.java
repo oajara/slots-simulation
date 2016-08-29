@@ -169,22 +169,31 @@ public class ProgNormalNode extends Program {
     private void handleTakeSlots(SlotsMessageTakeSlots msg) {
         int takenSlots = msg.getQuantity();
         int[] takenArray = new int[takenSlots];
-        for (int i = 0; i < takenSlots; i++) {
+        int i,t;
+        
+        t = 0;
+        
+        for (i = 0; i < takenSlots; i++) {
+            takenArray[i] = -1;
+        }
+        
+        for (i = 0; i < takenSlots; i++) {
             int freeSlot = this.getFirstFreeHomelessSlotIndex();
             if(freeSlot != -1) {
                 this.slotsTable[freeSlot].setOwner(msg.senderId);
                 this.slotsTable[freeSlot].setStatus(Slot.STATUS_FREE);
                 takenArray[i] = freeSlot;
+                t++;
             } else {
-                println("No free slot to take!");
+
                 // end loop
-                takenArray[i] = -1;
+                i = takenSlots;
             }
         }
         
         this.println("Handling Take["+takenSlots+"] message from node#"+
-                msg.getSenderId()+". Now he owns: "
-                +Arrays.toString(takenArray));       
+                    msg.getSenderId()+". Now he owns "+t+": "
+                    +Arrays.toString(takenArray));       
         
         if(msg.getSenderId() == this.nodeId) {
             this.pendingTake = false;
@@ -193,8 +202,14 @@ public class ProgNormalNode extends Program {
     
     private void handleGiveAway(SlotsMessageGiveAway msg) {
         int[] indexes = msg.getIndexes();
+        int counter = 0;
+        for(int i = 0; i< GIVE_AWAY; i++) {
+            if (indexes[i] != -1) {
+                counter++;
+            }
+        }        
         
-        this.println("Received GiveAway message from Node#"+msg.getSenderId()+": "
+        this.println("Received GiveAway["+counter+"] message from Node#"+msg.getSenderId()+": "
                 +Arrays.toString(indexes));
         for(int i = 0; i < indexes.length; i++) {
             this.slotsTable[i].setStatus(Slot.STATUS_DONATING);
@@ -233,7 +248,13 @@ public class ProgNormalNode extends Program {
     }
     
     private void broadcastGiveAwaySlots(int[] slotsIndexes) {
-        this.println("Broadcasting Give Away Message: "+ Arrays.toString(slotsIndexes));
+        int counter = 0;
+        for(int i = 0; i< GIVE_AWAY; i++) {
+            if (slotsIndexes[i] != -1) {
+                counter++;
+            }
+        }
+        this.println("Broadcasting Give Away["+counter+"] Message: "+ Arrays.toString(slotsIndexes));
         SlotsMessageGiveAway msg = new SlotsMessageGiveAway(slotsIndexes, this.nodeId);
         this.pendingGiveAway = true;
         this.broadcast(msg);
@@ -435,12 +456,6 @@ public class ProgNormalNode extends Program {
         return counter;
     }
 
-    private void cleanBinaryList(boolean[] list) {
-        for(int i = 1; i < list.length; i++) {
-            list[i] = false;
-        }
-    }
-
     private void cleanNodesLists() {
         for(int i = 1; i <= SlotsDonation.MAX_NODES; i++) {
             this.initializedNodes[i] = false;
@@ -501,10 +516,7 @@ public class ProgNormalNode extends Program {
         double val, next_float;
 
         val =  this.random.nextGaussian() * FI_RANGE;
-		/*
-		(-50;50) el 70% de las veces (std dev 1)
-		(-100;100) el 95% de las veces
-		*/
+
         next_float = val + this.arrivalMedian; // median correction
 
         // limits
