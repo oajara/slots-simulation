@@ -14,9 +14,12 @@ class Testing {
 //            //System.out.println("LifeTime: "+t.getLifeTime(r));
 //            System.out.println(t.getNextForkTime(r));
 //        }
-        int[] vector = {1,2,3,4,5,6,7,8,9,10};
-        int[] shuff = Testing.RandomizeArray(vector);
-        System.out.println(Arrays.toString(shuff));
+//        int[] vector = {1,2,3,4,5,6,7,8,9,10};
+//        int[] shuff = Testing.RandomizeArray(vector);
+//        System.out.println(Arrays.toString(shuff));
+        for(int i = 0; i < 1000 ; i++) {
+            System.out.println(t.getNextDeltaForkPoisson(r));
+        }
     }
     
     public int getLifeTime(Random r) {
@@ -31,6 +34,10 @@ class Testing {
         int lt = Math.abs((int) Math.round(val));
         return (lt);
     }    
+    
+    public int getNextDeltaForkPoisson(Random r) {
+        return  (int)(1+Math.round(Math.log(1-r.nextDouble())/(-0.3)));
+    }
     
     public int getNextForkTime(Random r) {
         double val =  r.nextGaussian() * 90;
