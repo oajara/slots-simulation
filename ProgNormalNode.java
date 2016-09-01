@@ -36,12 +36,11 @@ public class ProgNormalNode extends Program {
     public static final int FI_MIN_AVG = 5;
     public static final int FI_MAX_AVG = 10;
     
-    public static final double LAMBDA_POISSON_ARRIVAL = 0.3;
-    public static final double LAMBDA_POISSON_DURATION = 0.7;
+    public static final double LAMBDA_MIN = 0.21;
+    public static final double LAMBDA_MAX = 0.36;
 
     private final Random random;
-    private double lambdaPoissonArrival;
-    private double lambdaPoissonDuration;
+    private double lambdaArrival;
 
     private int arrivalMedian;
     private int nextMedianChange;
@@ -88,15 +87,21 @@ public class ProgNormalNode extends Program {
         sleep(number);
         this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
         this.arrivalMedian = this.getNextArrivalMedian();
-        this.lambdaPoissonArrival = this.round(1-this.random.nextDouble());
-        this.lambdaPoissonDuration = this.round(1-this.random.nextDouble());
+        this.lambdaArrival = this.getLambdaArrivals();
         this.timeLeftToFork = getTime()+this.getNextDeltaFork();
-        println("LAMBDA ARRIVALS: "+this.lambdaPoissonArrival
-        + " LAMBDA_DURATIONS: "+this.lambdaPoissonDuration);
+        println("LAMBDA ARRIVALS: "+this.lambdaArrival);
         this.doConnect();
 
         // Start with algorithm
         this.slotsLoop();
+    }
+    
+    private double getLambdaArrivals(){
+        double lambda = this.random.nextDouble();
+        while(lambda < LAMBDA_MIN || lambda > LAMBDA_MAX) {
+            lambda = this.random.nextDouble();
+        }
+        return this.round(lambda);
     }
     
     private double round(double val) {
@@ -528,12 +533,22 @@ public class ProgNormalNode extends Program {
 
     private int getNextDeltaFork() {
         return  (int)(1+Math.round(
-                Math.log(1-this.random.nextDouble())/(-this.lambdaPoissonArrival)));
+                Math.log(1-this.random.nextDouble())/(-this.lambdaArrival)));
     }
 
     private int getRandomProcessLifeTime() {
-        return  (int)(1+Math.round(
-                Math.log(1-this.random.nextDouble())/(-this.lambdaPoissonDuration)));
+        //int lt = MIN_PLIFETIME + this.random.nextInt(MAX_PLIFETIME - MIN_PLIFETIME + 1);
+
+        double val = this.random.nextFloat();
+
+
+        for (int i = 1 + LT_MIN ; i<LT_MAX; i++) {
+            if(val < 1-(1/(double)i)) {
+                return (i - 1) * LT_UNIT;
+            }
+        }
+
+        return (LT_MAX * LT_UNIT);
     }
 
     /**
