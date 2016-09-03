@@ -15,9 +15,12 @@ public class ProgNormalNode extends Program {
     
     public static final int NO_PRIMARY_MBR = -1;
     
-    public static final int MIN_OWNED_SLOTS = 16;
-    public static final int FREE_SLOTS_LOW = 8;
+//    public static final int MIN_OWNED_SLOTS = 16;
+//    public static final int FREE_SLOTS_LOW = 8;
     public static final int SLOTS_BY_MSG = 1024;
+    
+    public static final int MIN_OWNED_SLOTS = 4;
+    public static final int FREE_SLOTS_LOW = 2;
     
     public static final int MAX_NEW_PROCS = 1;
     
@@ -32,6 +35,10 @@ public class ProgNormalNode extends Program {
     
     public static final int FI_MIN_AVG = 5;
     public static final int FI_MAX_AVG = 10;
+    
+    
+    public static final double LAMBDA_MIN = 0.05;
+    public static final double LAMBDA_MAX = 0.15;    
     
    
 //    public static final int MIN_OWNED_SLOTS = 4;
@@ -87,11 +94,25 @@ public class ProgNormalNode extends Program {
         number = this.nodeId * 10; 
         println("Sleeping: "+number);
         sleep(number);
+        this.lambdaArrival = this.getLambdaArrivals();        
         this.timeLeftToFork = getTime()+this.getNextDeltaFork();
+        println("LAMBDA ARRIVALS: "+this.lambdaArrival);        
 	this.doConnect();
         // Start with algorithm
         this.slotsLoop();
     }
+    
+    private double getLambdaArrivals(){
+        double lambda = this.random.nextDouble();
+        while(lambda < LAMBDA_MIN || lambda > LAMBDA_MAX) {
+            lambda = this.random.nextDouble();
+        }
+        return this.round(lambda);
+    }    
+    
+    private double round(double val) {
+        return((double) Math.round(val * 100) / 100);
+    }    
     
     public void getInfoLine() {
         //(NodeId, Forks OK, Forks Failed, Exits, TotalRequested, TotalReceived, GotZero)
