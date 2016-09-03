@@ -8,6 +8,7 @@ public class Slot {
     public static final int STATUS_USED = 1;
     public static final int STATUS_DONATING = 2;
     public static final int STATUS_UNINIT = 3;
+    public static final int STATUS_UNCLAIMED = 4;
     
     public Slot(int owner, int status, int timeLeft) {
         this.owner = owner;
@@ -57,6 +58,10 @@ public class Slot {
 
     public void setStatus(int status) {
         this.status = status;
+    }
+    
+    public String asString() {
+        return "ST: " + this.status + " PLT: "+this.processTimeLeft;
     }
 
 }

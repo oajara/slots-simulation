@@ -1,4 +1,3 @@
-// NORMAL SLOT NODE - PAP 20160529
 import daj.Message;
 import daj.Program;
 import java.util.*;
@@ -25,7 +24,7 @@ public class ProgNormalNode extends Program {
 
     public static final int MEDIAN_CHANGE_INTERVAL = 5000;
 
-    public static final int LT_UNIT = 45;
+    public static final int LT_UNIT = 23;
     public static final int LT_MIN = 1;
     public static final int LT_MAX = 100;
 
@@ -36,14 +35,15 @@ public class ProgNormalNode extends Program {
     public static final int FI_MIN_AVG = 5;
     public static final int FI_MAX_AVG = 10;
     
-    public static final double LAMBDA_MIN = 0.21;
-    public static final double LAMBDA_MAX = 0.36;
+    public static final double LAMBDA_MIN = 0.05;
+    public static final double LAMBDA_MAX = 0.15;
 
     private final Random random;
     private double lambdaArrival;
+    
+    int lastTimeRegistered;
 
     private int arrivalMedian;
-    private int nextMedianChange;
     private Slot[] slotsTable = new Slot[SlotsDonation.TOTAL_SLOTS];
     private boolean[] activeNodes = new boolean[SlotsDonation.MAX_NODES+1];
     private boolean[] initializedNodes = new boolean[SlotsDonation.MAX_NODES+1];
@@ -73,7 +73,7 @@ public class ProgNormalNode extends Program {
         this.random = new Random();
         this.nodeId = id;
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
-            slotsTable[i] = new Slot(Slot.NO_OWNER, Slot.STATUS_FREE, 0);
+            slotsTable[i] = new Slot(Slot.NO_OWNER, Slot.STATUS_UNCLAIMED, 0);
         }
 
         this.cleanNodesLists();
@@ -85,7 +85,6 @@ public class ProgNormalNode extends Program {
         number = this.nodeId * 1;
         println("Sleeping: "+number);
         sleep(number);
-        this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
         this.arrivalMedian = this.getNextArrivalMedian();
         this.lambdaArrival = this.getLambdaArrivals();
         this.timeLeftToFork = getTime()+this.getNextDeltaFork();
@@ -93,6 +92,7 @@ public class ProgNormalNode extends Program {
         this.doConnect();
 
         // Start with algorithm
+        this.lastTimeRegistered = getTime();
         this.slotsLoop();
     }
     
@@ -149,7 +149,7 @@ public class ProgNormalNode extends Program {
         this.state = STS_RUNNING;
         Message msg;
         while(true) {
-//            this.println("Waiting for message...");
+            this.println("Waiting for message...");
             msg = this.in(0).receive(1);
             if (msg != null) {
                 if(msg instanceof SpreadMessage) {
@@ -230,8 +230,10 @@ public class ProgNormalNode extends Program {
         
         this.println("Received GiveAway["+counter+"] message from Node#"+msg.getSenderId()+": "
                 +Arrays.toString(indexes));
+        
         for(int i = 0; i < indexes.length; i++) {
-            this.slotsTable[i].setStatus(Slot.STATUS_DONATING);
+            this.slotsTable[i].setStatus(Slot.STATUS_UNCLAIMED);
+            this.slotsTable[i].setOwner(Slot.NO_OWNER);
         }
         
         if(msg.getSenderId() == this.nodeId) {
@@ -287,7 +289,6 @@ public class ProgNormalNode extends Program {
         for(int i = 0; i < GIVE_AWAY; i++) {
             indexes[i] = this.getFirstOwnedFreeSlotIndex();
             this.slotsTable[indexes[i]].setStatus(Slot.STATUS_DONATING);
-            //this.slotsTable[indexes[i]].setStatus(Slot.NO_OWNER);
         }
         return indexes;
     }
@@ -332,16 +333,19 @@ public class ProgNormalNode extends Program {
     }
 
     public void decProcessesLifetimes() {
+   //     this.println("Checking possible ending processes...");
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
             if(slotsTable[i].isUsed() && slotsTable[i].getOwner() == this.nodeId) {
-                if(slotsTable[i].processTimeLeft == 0) {
-//                    println("Killing process: "+i);
+ //               this.println("SLOT: "+i+" "+slotsTable[i].asString());
+                int delta = getTime() - this.lastTimeRegistered;
+ //               println("Delta: "+delta);
+                slotsTable[i].processTimeLeft = slotsTable[i].processTimeLeft - delta;                
+                if(slotsTable[i].processTimeLeft <= 0) {
                     this.exitProcess(i);
-                } else {
-                    slotsTable[i].processTimeLeft--;
                 }
             }
         }
+        this.lastTimeRegistered = getTime();
     }
     
     private void createProcess(int slotIndex) {
@@ -352,10 +356,11 @@ public class ProgNormalNode extends Program {
         if (slotsTable[slotIndex].getStatus() != Slot.STATUS_FREE ){
             this.println("[ERROR] This slot is not free!");
             return;
-        }        
-        slotsTable[slotIndex].setProcessLifetime(this.getRandomProcessLifeTime());
+        } 
+        int newProcessLifetime = this.getRandomProcessLifeTime();
+        this.slotsTable[slotIndex].setProcessLifetime(newProcessLifetime);
         this.slotsTable[slotIndex].setStatus(Slot.STATUS_USED);
-        println("Created a process["+slotIndex+"] of lifetime "+slotsTable[slotIndex].processTimeLeft);
+        this.println("Created a process["+slotIndex+"] of lifetime "+newProcessLifetime);
     }
 
     private boolean isInitialized(int nodeId) {
@@ -389,17 +394,6 @@ public class ProgNormalNode extends Program {
         }
     }
 
-    private int countActive(boolean[] list) {
-        int counter = 0;
-        for(int i = 0; i < list.length; i++) {
-            if(list[i]) {
-                counter++;
-            }
-        }
-        return counter;
-
-    }
-
     public int getFreeSlots() {
         int counter = 0;
         for(int i = 0; i<SlotsDonation.TOTAL_SLOTS; i++) {
@@ -431,15 +425,6 @@ public class ProgNormalNode extends Program {
     }
 
     private void processForkExit() {
-        // check if it's time to change the process arrival median
-        if(this.nextMedianChange == 0) {
-            this.arrivalMedian = this.getNextArrivalMedian();
-            this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
-            println("Changed fork arrival median to: "+ this.arrivalMedian);
-        } else {
-            this.nextMedianChange--;
-        }
-
         // if we are connected and init we can try stuff
         if(!this.isConnected() || !this.isInitialized()) {
             this.println("[ERROR] I'm not connected or not init");
@@ -501,8 +486,7 @@ public class ProgNormalNode extends Program {
 
     private int getFirstFreeHomelessSlotIndex(){
         for (int i = 0; i < SlotsDonation.TOTAL_SLOTS ; i++) {
-            if(slotsTable[i].getOwner() == Slot.NO_OWNER
-                    && slotsTable[i].isFree()){
+            if(slotsTable[i].getOwner() == Slot.NO_OWNER){
                 return i;
             }
         }
