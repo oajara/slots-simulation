@@ -7,9 +7,9 @@ public class SlotsDonation extends Application {
     
     public static final int WINW = 600;
     public static final int WINH = 300;
-    public static final int NODES = 32;
+    public static final int NODES = 8;
     public static final int MAX_NODES = NODES;
-    public static final int TOTAL_SLOTS = 1024;
+    public static final int TOTAL_SLOTS = 128;
     
     private Node[] nodes;
 
@@ -44,11 +44,52 @@ public class SlotsDonation extends Application {
           "TODO: complete this info";
     }
     
+    private void printCommit() {
+        java.lang.Process p;
+        String command_branch = "git rev-parse --abbrev-ref HEAD";
+        String command_commmit = "git rev-parse HEAD";
+
+	StringBuffer output = new StringBuffer();
+        
+        try {
+                p = Runtime.getRuntime().exec(command_branch);
+                p.waitFor();
+                BufferedReader reader =
+                   new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+                String line = "";
+                while ((line = reader.readLine())!= null) {
+                        output.append("Branch: "+line + "\n");
+                }
+
+        } catch (Exception e) {
+                e.printStackTrace();
+        }      
+        
+        try {
+                p = Runtime.getRuntime().exec(command_commmit);
+                p.waitFor();
+                BufferedReader reader =
+                   new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+                String line = "";
+                while ((line = reader.readLine())!= null) {
+                        output.append("Commit: "+line + "\n");
+                }
+
+        } catch (Exception e) {
+                e.printStackTrace();
+        }            
+        
+        System.out.println(output.toString());
+    }    
+    
     public void printParameters() {
+        this.printCommit();
         System.out.println("NR_NODES: "+NODES+"\nSLOTS: "+TOTAL_SLOTS+
                 "\nMIN_OWNED_SLOTS: "+ProgNormalNode.MIN_OWNED_SLOTS+"\nFREE_SLOTS_LOW: "+
                 ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG+
-                "\nMEDIAN_CHANGE_INTERVAL: "+ProgNormalNode.MEDIAN_CHANGE_INTERVAL+"\nLT_UNIT: "+
+                "\nLT_UNIT: "+
                 ProgNormalNode.LT_UNIT+"\nLT_MIN: "+ProgNormalNode.LT_MIN+
                 "\nLT_MIN: "+ProgNormalNode.LT_MAX+"\nFI_MAX: "+
                 ProgNormalNode.FI_MAX+"\nFI_MIN: "+ProgNormalNode.FI_MIN+

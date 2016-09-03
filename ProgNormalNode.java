@@ -21,11 +21,10 @@ public class ProgNormalNode extends Program {
     
     public static final int MAX_NEW_PROCS = 1;
     
-    public static final int MEDIAN_CHANGE_INTERVAL = 5000;
     
-    public static final int LT_UNIT = 45;
+    public static final int LT_UNIT = 23;
     public static final int LT_MIN = 1;
-    public static final int LT_MAX = 100;    
+    public static final int LT_MAX = 100;   
     
     public static final int FI_MAX=  10;
     public static final int FI_MIN = 1;
@@ -40,8 +39,6 @@ public class ProgNormalNode extends Program {
 //    public static final int SLOTS_BY_MSG = 3;    
     
     private final Random random;
-    private int arrivalMedian;
-    private int nextMedianChange;
     private Slot[] slotsTable = new Slot[SlotsDonation.TOTAL_SLOTS];
 //    private Process[] processTable = new Process[SlotsDonation.TOTAL_SLOTS];
     private boolean[] activeNodes = new boolean[SlotsDonation.MAX_NODES+1];
@@ -54,7 +51,6 @@ public class ProgNormalNode extends Program {
     private int primaryMember;
     private int maxOwnedSlots = SlotsDonation.TOTAL_SLOTS;
     private boolean sysBarrier = false;
-    private boolean pendingConnect = false;
     
     private boolean gotAtLeastOne = false;
     
@@ -71,6 +67,7 @@ public class ProgNormalNode extends Program {
     private int counterAtMessage = 0;
     
     private int timeLeftToFork;
+    private double lambdaArrival;
     
     public ProgNormalNode(int id) { 
         this.random = new Random();
@@ -90,8 +87,6 @@ public class ProgNormalNode extends Program {
         number = this.nodeId * 10; 
         println("Sleeping: "+number);
         sleep(number);
-        this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
-        this.arrivalMedian = this.getNextArrivalMedian();
         this.timeLeftToFork = getTime()+this.getNextDeltaFork();
 	this.doConnect();
         // Start with algorithm
@@ -731,7 +726,6 @@ public class ProgNormalNode extends Program {
                 +"\nRequested Slots: "+this.counterRequestedSlots
                 +"\nDonated To Me Slots: "+this.counterGotSlots
                 +"\nDonated By Me Slots: "+this.counterDonatedSlots
-                +"\nArrival Median: "+this.arrivalMedian
                 +"\nNext Fork: "+this.timeLeftToFork
                 +"\nCurrent Time: "+getTime();
     }
@@ -741,21 +735,16 @@ public class ProgNormalNode extends Program {
     }    
     
     public void decProcessesLifetimes() {
-        int counter = 0;
         for(int i = 0; i < SlotsDonation.TOTAL_SLOTS; i++) {
             if(slotsTable[i].isUsed() && slotsTable[i].getOwner() == this.nodeId) {
                 if(slotsTable[i].processTimeLeft == 0) {
                     println("Killing process: "+i);
                     this.doExit(i);    
-                    counter++;
                 } else {
                     slotsTable[i].processTimeLeft--;
                 }
             }
         }  
-//        if (counter > 0)
- //           this.println("Number of destroyed processes: " + counter);
-//        this.println("Process Table: "+Arrays.toString(this.processTable));
     }
     
     /** find first owned free slot and use it **/
@@ -893,14 +882,6 @@ public class ProgNormalNode extends Program {
     }       
 
     private void processForkExit() {
-        if(this.nextMedianChange == 0) {
-            this.arrivalMedian = this.getNextArrivalMedian();
-            this.nextMedianChange = MEDIAN_CHANGE_INTERVAL;
-            println("Changed fork arrival median to: "+ this.arrivalMedian);
-        } else {
-            this.nextMedianChange--;
-        }
-        
         if (this.timeLeftToFork <= getTime()) { // time for a new fork
             this.timeLeftToFork = getTime()+this.getNextDeltaFork();
             //println("Next fork in: "+this.timeLeftToFork);
@@ -920,7 +901,6 @@ public class ProgNormalNode extends Program {
     
     private void doConnect() {
         println("Connecting...");
-        this.pendingConnect = true;
         this.counterConnects++;
         out(0).send(new SpreadMessageJoin(this.nodeId));
     }
@@ -972,7 +952,6 @@ public class ProgNormalNode extends Program {
         
         this.cleanCounterGotFirstAt();
         this.sysBarrier = false;
-        this.pendingConnect = false;
         this.maxOwnedSlots = 0;
         
         this.cleanBinaryList(this.bmWaitSts);
@@ -1077,29 +1056,8 @@ public class ProgNormalNode extends Program {
     }
 
     private int getNextDeltaFork() {
-        double val, next_float;
-        
-//        do {
-//            val =  this.random.nextGaussian() * 50;
-//            /*
-//            (-50;50) el 70% de las veces (std dev 1)
-//            (-100;100) el 95% de las veces
-//            */
-//            next_float = val + this.arrivalMedian; // median correction
-//        } while (next_float < 0 || next_float > 100); // limits
-        
-        val =  this.random.nextGaussian() * FI_RANGE;
-        /*
-        (-50;50) el 70% de las veces (std dev 1)
-        (-100;100) el 95% de las veces
-        */
-        next_float = val + this.arrivalMedian; // median correction
-        
-        // limits
-        next_float = next_float < FI_MIN ? FI_MIN : next_float;
-        next_float = next_float > FI_MAX ? FI_MAX : next_float;
-
-        return ((int) Math.round(next_float));      
+        return  (int)(1+Math.round(
+                Math.log(1-this.random.nextDouble())/(-this.lambdaArrival)));
     }
     
     private int getRandomProcessLifeTime() {
@@ -1116,14 +1074,5 @@ public class ProgNormalNode extends Program {
         
         return (LT_MAX * LT_UNIT);
     }       
-    
-    /**
-     * Returns a uniform random median in the interval [10;90]
-     * @return 
-     */
-    private int getNextArrivalMedian() {
-        int median = FI_MIN_AVG + this.random.nextInt(FI_MAX_AVG - FI_MIN_AVG + 1);
-        return (median);
-    }
     
 }

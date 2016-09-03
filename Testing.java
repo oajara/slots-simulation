@@ -1,5 +1,8 @@
 import java.util.Arrays;
 import java.util.Random;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.Process;
 
 /*
 TODO: generalizar vector shuffle: max 64, pasar actual length como param 
@@ -16,7 +19,8 @@ class Testing {
 //        }
         int[] vector = {1,2,3,4,5,6,7,8,9,10};
         int[] shuff = Testing.RandomizeArray(vector);
-        System.out.println(Arrays.toString(shuff));
+        //System.out.println(Arrays.toString(shuff));
+        t.printCommit();
     }
     
     public int getLifeTime(Random r) {
@@ -55,6 +59,46 @@ class Testing {
 
             return array;
     }    
+    
+    public void printCommit() {
+        Process p;
+        String command_branch = "git rev-parse --abbrev-ref HEAD";
+        String command_commmit = "git rev-parse HEAD";
+
+	StringBuffer output = new StringBuffer();
+        
+        try {
+                p = Runtime.getRuntime().exec(command_branch);
+                p.waitFor();
+                BufferedReader reader =
+                   new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+                String line = "";
+                while ((line = reader.readLine())!= null) {
+                        output.append("Branch: "+line + "\n");
+                }
+
+        } catch (Exception e) {
+                e.printStackTrace();
+        }      
+        
+        try {
+                p = Runtime.getRuntime().exec(command_commmit);
+                p.waitFor();
+                BufferedReader reader =
+                   new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+                String line = "";
+                while ((line = reader.readLine())!= null) {
+                        output.append("Commit: "+line + "\n");
+                }
+
+        } catch (Exception e) {
+                e.printStackTrace();
+        }            
+        
+        System.out.println(output.toString());
+    }
     
 //    public int getUnif(Random r) {
 //        return r.nextInt(1)
