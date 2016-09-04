@@ -35,8 +35,8 @@ public class ProgNormalNode extends Program {
     public static final int FI_MIN_AVG = 5;
     public static final int FI_MAX_AVG = 10;
     
-    public static final double LAMBDA_MIN = 0.05;
-    public static final double LAMBDA_MAX = 0.15;
+    public static final double LAMBDA_MIN = 0.3;
+    public static final double LAMBDA_MAX = 0.7;
 
     private final Random random;
     private double lambdaArrival;

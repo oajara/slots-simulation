@@ -1,5 +1,5 @@
 //package daj;
-
+import java.io.*; 
 import daj.*;
 
 
@@ -7,9 +7,9 @@ public class SlotsDonation extends Application {
 
     public static final int WINW = 600;
     public static final int WINH = 300;
-    public static final int NODES = 8;
+    public static final int NODES = 32;
     public static final int MAX_NODES = NODES;
-    public static final int TOTAL_SLOTS = 128;
+    public static final int TOTAL_SLOTS = 1024;
 
     private Node[] nodes;
 
@@ -36,6 +36,46 @@ public class SlotsDonation extends Application {
             ((ProgNormalNode) (this.nodes[i].getProgram())).getInfoLine();
         }
     }
+    
+    private void printCommit() {
+        java.lang.Process p;
+        String command_branch = "git rev-parse --abbrev-ref HEAD";
+        String command_commmit = "git rev-parse HEAD";
+
+        StringBuffer output = new StringBuffer();
+        
+        try {
+                p = Runtime.getRuntime().exec(command_branch);
+                p.waitFor();
+                BufferedReader reader =
+                   new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+                String line = "";
+                while ((line = reader.readLine())!= null) {
+                        output.append("Branch: "+line + "\n");
+                }
+
+        } catch (Exception e) {
+                e.printStackTrace();
+        }      
+        
+        try {
+                p = Runtime.getRuntime().exec(command_commmit);
+                p.waitFor();
+                BufferedReader reader =
+                   new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+                String line = "";
+                while ((line = reader.readLine())!= null) {
+                        output.append("Commit: "+line + "\n");
+                }
+
+        } catch (Exception e) {
+                e.printStackTrace();
+        }            
+        
+        System.out.println(output.toString());
+    }      
 
     @Override
     public String getText() {
@@ -45,6 +85,7 @@ public class SlotsDonation extends Application {
     }
 
     public void printParameters() {
+        this.printCommit();
         System.out.println("NR_NODES: " + NODES + "\nSLOTS: " + TOTAL_SLOTS +
                 "\nFREE_LOW: " + ProgNormalNode.FREE_LOW + "\nFREE_HIGH: " +
                 ProgNormalNode.FREE_HIGH + "\nGIVE_AWAY: " + ProgNormalNode.GIVE_AWAY);
