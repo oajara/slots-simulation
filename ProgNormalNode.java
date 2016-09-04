@@ -37,6 +37,8 @@ public class ProgNormalNode extends Program {
     
     public static final double LAMBDA_MIN = 0.3;
     public static final double LAMBDA_MAX = 0.7;
+    
+    public static final int RELAMBDA = 10000;
 
     private final Random random;
     private double lambdaArrival;
@@ -65,6 +67,7 @@ public class ProgNormalNode extends Program {
     private int[] counterGotFirstSlotAt = new int[SlotsDonation.MAX_NODES-1];
     private int counterAtMessage = 0;
     private int timeLeftToFork;
+    private int nextLambdaChange;
     
     private boolean pendingTake = false;
     private boolean pendingGiveAway = false;
@@ -88,7 +91,9 @@ public class ProgNormalNode extends Program {
         this.arrivalMedian = this.getNextArrivalMedian();
         this.lambdaArrival = this.getLambdaArrivals();
         this.timeLeftToFork = getTime()+this.getNextDeltaFork();
+        this.nextLambdaChange = RELAMBDA;
         println("LAMBDA ARRIVALS: "+this.lambdaArrival);
+        
         this.doConnect();
 
         // Start with algorithm
@@ -429,6 +434,12 @@ public class ProgNormalNode extends Program {
         if(!this.isConnected() || !this.isInitialized()) {
             this.println("[ERROR] I'm not connected or not init");
         } else {
+            // time to change lambda?
+            if(getTime() > this.nextLambdaChange) {
+                this.lambdaArrival = this.getLambdaArrivals();
+                this.println("LAMBDA changed to: "+this.lambdaArrival);
+                this.nextLambdaChange = getTime() + RELAMBDA;
+            }
             // check process that need to finish
             this.decProcessesLifetimes();
             
