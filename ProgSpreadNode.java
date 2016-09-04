@@ -125,19 +125,23 @@ public class ProgSpreadNode extends Program {
     private void sendToAll(Message msg) {
         /* send to  all active nodes, including requester */
         //println("Sending message to all active nodes...");
-//        int[] vector = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
-        int[] vector = {1,2,3,4,5,6,7,8};
-        
+        //int[] vector = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
+        //int[] vector = {1,2,3,4};        
+        int[] vector = new int[SlotsDonation.NODES];
+        for (int i = 0; i < vector.length; i++) {
+            vector[i] = i + 1;
+        }
         int[] shuff = Testing.RandomizeArray(vector);
-        
+
         for(int i=0; i<SlotsDonation.NODES; i++){
             if(this.isActive(shuff[i])) {
                 //this.println("... to node#"+i);
                 out(shuff[i]-1).send(msg); // because link to node n is locate at out(n-1)
             }
-        } 
-        broadcasted++;        
+        }
+        broadcasted++;
     }
+    
     
 
     public void getInfoLine() {
