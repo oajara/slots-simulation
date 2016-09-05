@@ -38,7 +38,10 @@ public class ProgNormalNode extends Program {
     
     
     public static final double LAMBDA_MIN = 0.3;
-    public static final double LAMBDA_MAX = 0.7;    
+    public static final double LAMBDA_MAX = 0.7; 
+    
+    public static final int RELAMBDA = 10000;
+    
     
    
 //    public static final int MIN_OWNED_SLOTS = 4;
@@ -75,6 +78,7 @@ public class ProgNormalNode extends Program {
     
     private int timeLeftToFork;
     private double lambdaArrival;
+    private int nextLambdaChange;
     
     public ProgNormalNode(int id) { 
         this.random = new Random();
@@ -96,6 +100,7 @@ public class ProgNormalNode extends Program {
         sleep(number);
         this.lambdaArrival = this.getLambdaArrivals();        
         this.timeLeftToFork = getTime()+this.getNextDeltaFork();
+        this.nextLambdaChange = RELAMBDA;
         println("LAMBDA ARRIVALS: "+this.lambdaArrival);        
 	this.doConnect();
         // Start with algorithm
@@ -903,6 +908,13 @@ public class ProgNormalNode extends Program {
     }       
 
     private void processForkExit() {
+        // time to change lambda?
+        if(getTime() > this.nextLambdaChange) {
+            this.lambdaArrival = this.getLambdaArrivals();
+            this.println("LAMBDA changed to: "+this.lambdaArrival);
+            this.nextLambdaChange = getTime() + RELAMBDA;
+        }
+
         if (this.timeLeftToFork <= getTime()) { // time for a new fork
             this.timeLeftToFork = getTime()+this.getNextDeltaFork();
             //println("Next fork in: "+this.timeLeftToFork);
