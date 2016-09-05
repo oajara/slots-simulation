@@ -10,9 +10,9 @@ public class SlotsDonation extends Application {
     public static final int NODES = 32;
     public static final int MAX_NODES = NODES;
     public static final int TOTAL_SLOTS = 1024;
-    
+                    
     private Node[] nodes;
-
+        
     public static void main(String[] args) {
         new SlotsDonation().run();
     }
@@ -26,6 +26,7 @@ public class SlotsDonation extends Application {
     }
     
     public void writeInfo() {
+        this.printCommit();
         System.out.println("Run Params: \nNR_NODES: "+NODES+"\nSLOTS: "+TOTAL_SLOTS+
                 "\nMIN_OWNED_SLOTS: "+ProgNormalNode.MIN_OWNED_SLOTS+"\nFREE_SLOTS_LOW: "+
                 ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG);
