@@ -29,7 +29,8 @@ public class SlotsDonation extends Application {
         this.printCommit();
         System.out.println("Run Params: \nNR_NODES: "+NODES+"\nSLOTS: "+TOTAL_SLOTS+
                 "\nMIN_OWNED_SLOTS: "+ProgNormalNode.MIN_OWNED_SLOTS+"\nFREE_SLOTS_LOW: "+
-                ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG);
+                ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG+
+                "\nLAMBDA INTERVAL: "+ProgNormalNode.LAMBDA_MIN+" - "+ProgNormalNode.LAMBDA_MAX);
         System.out.println("Joins, Leaves, Requests, Donates, Inits, PutStatus, NewStatus, MergeStatus");
         ((ProgSpreadNode)(this.nodes[0].getProgram())).getInfoLine();
         System.out.println("NodeId, ForksOK, ForksFail, Exits, TotalRequested, TotalReceived, GotZero");
@@ -92,10 +93,9 @@ public class SlotsDonation extends Application {
                 ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG+
                 "\nLT_UNIT: "+
                 ProgNormalNode.LT_UNIT+"\nLT_MIN: "+ProgNormalNode.LT_MIN+
-                "\nLT_MIN: "+ProgNormalNode.LT_MAX+"\nFI_MAX: "+
-                ProgNormalNode.FI_MAX+"\nFI_MIN: "+ProgNormalNode.FI_MIN+
-                "\nFI_RANGE: "+ProgNormalNode.FI_RANGE+"\nFI_MIN_AVG: "+
-                ProgNormalNode.FI_MIN_AVG+"\nFI_MAX_AVG: "+ProgNormalNode.FI_MAX_AVG);
+                "\nLT_MIN: "+ProgNormalNode.LT_MAX+
+                "\nLAMBDA INTERVAL: "+ProgNormalNode.LAMBDA_MIN+" - "+ProgNormalNode.LAMBDA_MAX+
+                "\nDURATION: "+ProgNormalNode.FINAL_T);
     }
     
     @Override
