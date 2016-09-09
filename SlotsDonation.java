@@ -95,6 +95,7 @@ public class SlotsDonation extends Application {
                 ProgNormalNode.LT_UNIT+"\nLT_MIN: "+ProgNormalNode.LT_MIN+
                 "\nLT_MIN: "+ProgNormalNode.LT_MAX+
                 "\nLAMBDA INTERVAL: "+ProgNormalNode.LAMBDA_MIN+" - "+ProgNormalNode.LAMBDA_MAX+
+                "\nLAMBDA CHANGE PERIOD: "+ProgNormalNode.RELAMBDA+
                 "\nDURATION: "+ProgNormalNode.FINAL_T);
     }
     

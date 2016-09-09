@@ -39,7 +39,7 @@ public class ProgNormalNode extends Program {
     public static final double LAMBDA_MIN = 0.01;
     public static final double LAMBDA_MAX = 0.1; 
     
-    public static final int RELAMBDA = 100000;
+    public static final int RELAMBDA = 5000;
     
     public static final int FINAL_T = 15000;
     
