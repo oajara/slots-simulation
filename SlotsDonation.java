@@ -9,7 +9,7 @@ public class SlotsDonation extends Application {
     public static final int WINH = 300;
     public static final int NODES = 32;
     public static final int MAX_NODES = NODES;
-    public static final int TOTAL_SLOTS = 1024;
+    public static final int TOTAL_SLOTS = 768;
 
     private Node[] nodes;
 
@@ -86,13 +86,17 @@ public class SlotsDonation extends Application {
 
     public void printParameters() {
         this.printCommit();
-        System.out.println("NR_NODES: " + NODES + "\nSLOTS: " + TOTAL_SLOTS +
-                "\nFREE_LOW: " + ProgNormalNode.FREE_LOW + "\nFREE_HIGH: " +
-                ProgNormalNode.FREE_HIGH + "\nGIVE_AWAY: " + ProgNormalNode.GIVE_AWAY);
-                /*+
-                "\nLAMBDA_ARRIVALS: " + ProgNormalNode.LAMBDA_POISSON_ARRIVAL + "\nLAMBDA_DURATIONS: " +
-                ProgNormalNode.LAMBDA_POISSON_DURATION);*/
+        System.out.println("NR_NODES: "+NODES+"\nSLOTS: "+TOTAL_SLOTS+
+                "\nMIN_OWNED_SLOTS: "+ProgNormalNode.MIN_OWNED_SLOTS+"\nFREE_SLOTS_LOW: "+
+                ProgNormalNode.FREE_SLOTS_LOW+"\nSLOTS_BY_MSG: "+ProgNormalNode.SLOTS_BY_MSG+
+                "\nLT_UNIT: "+
+                ProgNormalNode.LT_UNIT+"\nLT_MIN: "+ProgNormalNode.LT_MIN+
+                "\nLT_MIN: "+ProgNormalNode.LT_MAX+
+                "\nLAMBDA INTERVAL: "+ProgNormalNode.LAMBDA_MIN+" - "+ProgNormalNode.LAMBDA_MAX+
+                "\nLAMBDA CHANGE PERIOD: "+ProgNormalNode.RELAMBDA+
+                "\nDURATION: "+ProgNormalNode.FINAL_T);
     }
+    
 
     @Override
     public void construct() {

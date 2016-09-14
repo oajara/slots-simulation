@@ -24,7 +24,7 @@ public class ProgNormalNode extends Program {
 
     public static final int MEDIAN_CHANGE_INTERVAL = 5000;
 
-    public static final int LT_UNIT = 23;
+    public static final int LT_UNIT = 10;
     public static final int LT_MIN = 1;
     public static final int LT_MAX = 100;
 
@@ -35,10 +35,12 @@ public class ProgNormalNode extends Program {
     public static final int FI_MIN_AVG = 5;
     public static final int FI_MAX_AVG = 10;
     
-    public static final double LAMBDA_MIN = 0.3;
-    public static final double LAMBDA_MAX = 0.7;
+    public static final double LAMBDA_MIN = 0.5;
+    public static final double LAMBDA_MAX = 0.8;
     
     public static final int RELAMBDA = 10000;
+    public static final int FINAL_T = 100000;
+    
 
     private final Random random;
     private double lambdaArrival;
@@ -154,6 +156,10 @@ public class ProgNormalNode extends Program {
         this.state = STS_RUNNING;
         Message msg;
         while(true) {
+            if(getTime() > FINAL_T) {
+                System.exit(0);
+            }
+            
             this.println("Waiting for message...");
             msg = this.in(0).receive(1);
             if (msg != null) {
